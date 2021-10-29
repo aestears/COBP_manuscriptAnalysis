@@ -4,27 +4,32 @@
 # Alice Stears
 #////////////////
 
-require(tidyverse)
-require(sf)
-require(leaflet)
-require(wesanderson)
-require(RColorBrewer)
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(wesanderson)
+library(RColorBrewer)
 
 # load dataset
 setwd("/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/Raw Data")
-counts<- read.csv("./COBP_2018_data_7_14_20__all_REAL.csv", stringsAsFactors = FALSE) #will have to update file name as it changes w/ most current version
+counts<- read.csv("./COBP_data_10_25_20.csv", stringsAsFactors = FALSE) #will have to update file name as it changes w/ most current version
 sites <- read.csv("./COBP Plot Locations.csv", stringsAsFactors = FALSE)
 
 #make a column for year
 counts$Date_2018 <- as.POSIXct(counts$Date_2018, tz = "UTC", format = "%m/%d/%Y")
 #fix year
 lubridate::year(counts$Date_2018) <- ifelse(is.na(lubridate::year(counts$Date_2018))==TRUE, NA, lubridate::year(counts$Date_2018) + 2000)
+
 counts$Date_2019 <- as.POSIXct(counts$Date_2019, tz = "UTC", format = "%m/%d/%Y")
 lubridate::year(counts$Date_2019) <- ifelse(is.na(lubridate::year(counts$Date_2019))==TRUE, NA, lubridate::year(counts$Date_2019) + 2000)
 
+counts$Date_2020 <- as.POSIXct(counts$Date_2020, tz = "UTC", format = "%m/%d/%Y")
+lubridate::year(counts$Date_2020) <- ifelse(is.na(lubridate::year(counts$Date_2020))==TRUE, NA, lubridate::year(counts$Date_2020) + 2000)
+
 #make sure survival is coded as a factor
-#counts$Alive_2018 <- as.factor(counts$Alive_2018)
-#counts$Alive_2019 <- as.factor(counts$Alive_2019)
+counts$Alive_2018 <- as.factor(counts$Alive_2018)
+counts$Alive_2019 <- as.factor(counts$Alive_2019)
+counts$Alive_2020 <- as.factor(counts$Alive_2020)
 
 #### make a map of plot locations ####
 #order the sites in alphabetical order by site name 
@@ -66,22 +71,32 @@ names(dens_2019) <- c("Plot_ID", "DataType", "Density")
 dens_2019$Year <- as.integer(2019)
 dens_2019 <- dens_2019[order(dens_2019$Plot_ID),]
 
+# for 2020 data
+dens_2020 <- aggregate(counts$ID, by = list(counts$Plot_ID, counts$Bolting_2020), FUN = length)
+names(dens_2020) <- c("Plot_ID", "Flowering", "Density")
+dens_2020[dens_2020$Flowering==0,"Flowering"] <- "vegetative_20"
+dens_2020[dens_2020$Flowering==1,"Flowering"] <- "reproductive_20"
+names(dens_2020) <- c("Plot_ID", "DataType", "Density")
+dens_2020$Year <- as.integer(2020)
+dens_2020 <- dens_2020[order(dens_2020$Plot_ID),]
+
 #combine
-dens <- rbind(dens_2018, dens_2019)
+dens <- rbind(dens_2018, dens_2019, dens_2020)
 
 #read in seedling data
-seeds <- read.csv("./COBP_seedlings_6_11_20.csv", stringsAsFactors = FALSE)
-seedsTot <- aggregate(seeds[,c("Seedlings_18", "Seedlings_19")], by = list(seeds$Plot_ID), FUN = sum)
-names(seedsTot) <- c("Plot_ID", "Density")
+seeds <- read.csv("./COBP_seedlings_8_23_21.csv", stringsAsFactors = FALSE)
+seedsTot <- aggregate(seeds[,c("Seedlings_18", "Seedlings_19", "Seedlings_20")], by = list(seeds$Plot_ID), FUN = sum)
+names(seedsTot)[1] <- c("Plot_ID")
 seedsTot$DataType <- "seedlings"
-names(seedsTot) <- c("Plot_ID", "Seedlings_18", "Seedlings_19", "DataType")
+names(seedsTot) <- c("Plot_ID", "Seedlings_18", "Seedlings_19", "Seedlings_20", "DataType")
 #reshape seedling data frame
 seedsTot <- seedsTot %>%  
-  pivot_longer(c("Seedlings_18", "Seedlings_19"), names_to = "Type", values_to = "Density")
+  pivot_longer(c("Seedlings_18", "Seedlings_19", "Seedlings_20"), names_to = "Type", values_to = "Density")
  
 names(seedsTot) <- c("Plot_ID", "Type", "DataType", "Density")
 seedsTot <- seedsTot[,c("Plot_ID","DataType", "Density")]
-seedsTot$Year <- ifelse(str_detect(seedsTot$DataType, "_18"), 2018, 2019)
+seedsTot$Year <- ifelse(str_detect(seedsTot$DataType, "_18"), 2018, 
+                        ifelse(str_detect(seedsTot$DataType, "_19"), 2019, 2020))
 
 #join seedling and other plant data together
 densTot <- rbind(dens, seedsTot)
@@ -92,6 +107,7 @@ names(densAll) <- c("Plot_ID", "Year", "Density")
 densAll$DataType <- NA
 densAll[densAll$Year==2018,"DataType"] <- "total_18"
 densAll[densAll$Year==2019,"DataType"] <- "total_19"
+densAll[densAll$Year == 2020, "DataType"] <- "total_20"
 densAll <- densAll[,c("Plot_ID", "DataType", "Density", "Year")]
 densTot <- rbind(densTot, densAll)
 densTot <- densTot[order(densTot$Plot_ID),]
@@ -106,7 +122,7 @@ densTot[densTot$Plot_ID %in% c("S1","S2","S3"),"SubPop"] <- "HQ5"
 densTot[densTot$Plot_ID %in% c("S4","S5","S6"),"SubPop"] <- "HQ3"
 densTot[densTot$Plot_ID %in% c("S7","S8","S9"),"SubPop"] <- "Meadow"
 
-dat <- densTot[densTot$DataType %in% c("vegetative_18", "reproductive_18", "vegetative_19", "reproductive_19", "Seedlings_18", "Seedlings_19"),]
+dat <- densTot[densTot$DataType %in% c("vegetative_18", "reproductive_18", "reproductive_20", "vegetative_20","vegetative_19", "reproductive_19", "Seedlings_18", "Seedlings_19", "Seedlings_20"),]
 #add sub-population ID to data frame
 dat <- left_join(dat, unique(counts[,c("Location","Site","Plot_ID")]), by = "Plot_ID")
 #reorder dat dataframe
@@ -129,7 +145,7 @@ dat$SiteYear <- str_c(dat$Site, "_", dat$Year)
 palette <- wes_palette("Darjeeling1", type = "continuous")
 palette
 
-# no a very good plot ggplot(dat) +
+# not a very good plot ggplot(dat) +
   # geom_bar(aes(x = SiteYear, y = Density, fill = DataType),  width = .8, stat = "identity") + 
   # labs(x = "Sub Population", y = "Number of Individuals" , fill = "Life Stage") + 
   # scale_fill_manual(values = c("tomato", "tomato4", "turquoise", "turquoise4", "goldenrod", "goldenrod4")) + 
@@ -142,11 +158,13 @@ palette
   #            linetype="dashed", color = "grey60") 
 
 #### Make size-class distributions by plot ####
-size <- select(counts, c("Location", "Site", "Plot_ID", "Quadrant", "ID", "LongestLeaf_cm_2018", "LongestLeaf_cm_2019", "Bolting_2018", "Bolting_2019", "No_Capsules_2018"))
+size <- select(counts, c("Location", "Site", "Plot_ID", "Quadrant", "ID", "LongestLeaf_cm_2018", "LongestLeaf_cm_2019", "LongestLeaf_cm_2020", "Bolting_2018", "Bolting_2019", "Bolting_2020", "No_Capsules_2018", "No_Capsules_2019", "No_Capsules_2020"))
 mu_2018 <- plyr::ddply(size, "Location", summarise, grp.mean=mean(LongestLeaf_cm_2018, na.rm = TRUE), 
                   grp.sd = sd(LongestLeaf_cm_2018, na.rm = TRUE))
 mu_2019 <- plyr::ddply(size, "Location", summarise, grp.mean=mean(LongestLeaf_cm_2019, na.rm = TRUE), 
                        grp.sd = sd(LongestLeaf_cm_2019, na.rm = TRUE))
+mu_2020 <- plyr::ddply(size, "Location", summarise, grp.mean=mean(LongestLeaf_cm_2020, na.rm = TRUE), 
+                       grp.sd = sd(LongestLeaf_cm_2020, na.rm = TRUE))
 # Less Good Plots (by year)
 # #plot for 2018 values
 # ggplot(counts, aes(x=LongestLeaf_cm_2018, color = Site)) + 
@@ -206,12 +224,17 @@ plot(x = NA, y = NA,
      xlab = c(""),
      ylab = c(""),
      main = c("Crow Creek"))
-abline(v = c(mean(counts[counts$Site=="Crow Creek","LongestLeaf_cm_2018"], na.rm = TRUE),mean(counts[counts$Site=="Crow Creek","LongestLeaf_cm_2019"], na.rm = TRUE)), lty = c(1,2), lwd = 2, col = "gray40")
+abline(v = c(mean(counts[counts$Site=="Crow Creek","LongestLeaf_cm_2018"], na.rm = TRUE),
+             mean(counts[counts$Site=="Crow Creek","LongestLeaf_cm_2019"], na.rm = TRUE), 
+             mean(counts[counts$Site=="Crow Creek","LongestLeaf_cm_2020"], na.rm = TRUE)
+             ), 
+       lty = c(1,2, 3), lwd = 2, col = "gray40")
 #lines(density(counts[counts$Site=="Crow Creek","LongestLeaf_cm_2019"], na.rm = TRUE), lty = 2, lwd = 2, col = pal[1])
 polygon(density(counts[counts$Site=="Crow Creek","LongestLeaf_cm_2018"], na.rm = TRUE), col = add.alpha(pal[1],.5), border = pal[1])
 polygon(density(counts[counts$Site=="Crow Creek","LongestLeaf_cm_2019"], na.rm = TRUE), col = add.alpha(pal[1],.5), border = pal[1], lty = 2)
+polygon(density(counts[counts$Site=="Crow Creek","LongestLeaf_cm_2020"], na.rm = TRUE), col = add.alpha(pal[1],.5), border = pal[1], lty = 3)
 polygon( x = c(23,23,46.5,46.5), y = c(.07, .16, .16, .07), border = "transparent", col = "gray90")
-legend(15,.19, legend = c("2018", "2019"), col = "gray40", lty = c(1,2), lwd = 2, text.width = 1, seg.len = 1, cex = .9, box.lty = 0, x.intersp = .2, bg = NA)
+legend(15,.19, legend = c("2018", "2019", "2020"), col = "gray40", lty = c(1,2, 3), lwd = 2, text.width = 1, seg.len = 1, cex = .9, box.lty = 0, x.intersp = .2, bg = NA)
 
 
 plot(x = NA, y = NA,
@@ -220,10 +243,14 @@ plot(x = NA, y = NA,
      xlab = c(""),
      ylab = c(""),
      main = c("Diamond Creek"))
-abline(v = c(mean(counts[counts$Site=="Diamond Creek","LongestLeaf_cm_2018"], na.rm = TRUE),mean(counts[counts$Site=="Diamond Creek","LongestLeaf_cm_2019"], na.rm = TRUE)), lty = c(1,2), lwd = 2, col = "gray40")
+abline(v = c(mean(counts[counts$Site=="Diamond Creek","LongestLeaf_cm_2018"], na.rm = TRUE),
+             mean(counts[counts$Site=="Diamond Creek","LongestLeaf_cm_2019"], na.rm = TRUE),
+             mean(counts[counts$Site=="Diamond Creek","LongestLeaf_cm_2020"], na.rm = TRUE)
+             ), lty = c(1,2, 3), lwd = 2, col = "gray40")
 #lines(density(counts[counts$Site=="Diamond Creek","LongestLeaf_cm_2019"], na.rm = TRUE), lty = 2, lwd = 2, col = "#D95F02")
 polygon(density(counts[counts$Site=="Diamond Creek","LongestLeaf_cm_2018"], na.rm = TRUE), col = add.alpha(pal[2],.5), border = pal[2])
 polygon(density(counts[counts$Site=="Diamond Creek","LongestLeaf_cm_2019"], na.rm = TRUE), col = add.alpha(pal[2],.5), border = pal[2], lty = 2)
+polygon(density(counts[counts$Site=="Diamond Creek","LongestLeaf_cm_2020"], na.rm = TRUE), col = add.alpha(pal[2],.5), border = pal[2], lty = 3)
 
 plot(x = NA, y = NA,
      ylim = c(0,.2),
@@ -231,10 +258,14 @@ plot(x = NA, y = NA,
      xlim = c(0,45), 
      ylab = c(""),
      main = c("HQ3"))
-abline(v = c(mean(counts[counts$Site=="HQ3","LongestLeaf_cm_2018"], na.rm = TRUE),mean(counts[counts$Site=="HQ3","LongestLeaf_cm_2019"], na.rm = TRUE)), lty = c(1,2), lwd = 2, col = "gray40")
+abline(v = c(mean(counts[counts$Site=="HQ3","LongestLeaf_cm_2018"], na.rm = TRUE),
+             mean(counts[counts$Site=="HQ3","LongestLeaf_cm_2019"], na.rm = TRUE),
+             mean(counts[counts$Site=="HQ3","LongestLeaf_cm_2020"], na.rm = TRUE)
+             ), lty = c(1,2, 3), lwd = 2, col = "gray40")
 # lines(density(counts[counts$Site=="HQ3","LongestLeaf_cm_2019"], na.rm = TRUE), lty = 2, lwd = 2, col = "#7570B3")
 polygon(density(counts[counts$Site=="HQ3","LongestLeaf_cm_2018"], na.rm = TRUE), col = add.alpha(pal[3],.5), border = pal[3])
 polygon(density(counts[counts$Site=="HQ3","LongestLeaf_cm_2019"], na.rm = TRUE), col = add.alpha(pal[3],.5), border = pal[3], lty = 2)
+polygon(density(counts[counts$Site=="HQ3","LongestLeaf_cm_2020"], na.rm = TRUE), col = add.alpha(pal[3],.5), border = pal[3], lty = 3)
 
 
 plot(x = NA, y = NA,
@@ -243,10 +274,15 @@ plot(x = NA, y = NA,
      ylab = c(""),
      xlim = c(0,45), 
      main = c("HQ5"))
-abline(v = c(mean(counts[counts$Site=="HQ5","LongestLeaf_cm_2018"], na.rm = TRUE),mean(counts[counts$Site=="HQ5","LongestLeaf_cm_2019"], na.rm = TRUE)), lty = c(1,2), lwd = 2, col = "gray40")
+abline(v = c(mean(counts[counts$Site=="HQ5","LongestLeaf_cm_2018"], na.rm = TRUE),
+             mean(counts[counts$Site=="HQ5","LongestLeaf_cm_2019"], na.rm = TRUE),
+             mean(counts[counts$Site=="HQ5","LongestLeaf_cm_2020"], na.rm = TRUE)
+             ), 
+       lty = c(1,2, 3), lwd = 2, col = "gray40")
 #lines(density(counts[counts$Site=="HQ5","LongestLeaf_cm_2019"], na.rm = TRUE), lty = 2, lwd = 2, col = "#E7298A")
 polygon(density(counts[counts$Site=="HQ5","LongestLeaf_cm_2018"], na.rm = TRUE), col = add.alpha(pal[4],.5), border = pal[4])
 polygon(density(counts[counts$Site=="HQ5","LongestLeaf_cm_2019"], na.rm = TRUE), col = add.alpha(pal[4],.5), border = pal[4], lty = 2)
+polygon(density(counts[counts$Site=="HQ5","LongestLeaf_cm_2020"], na.rm = TRUE), col = add.alpha(pal[4],.5), border = pal[4], lty = 3)
 
 
 plot(x = NA, y = NA,
@@ -255,10 +291,15 @@ plot(x = NA, y = NA,
      ylab = c(""),
      xlim = c(0,45), 
      main = c("Meadow"))
-abline(v = c(mean(counts[counts$Site=="Meadow","LongestLeaf_cm_2018"], na.rm = TRUE),mean(counts[counts$Site=="Meadow","LongestLeaf_cm_2019"], na.rm = TRUE)), lty = c(1,2), lwd = 2, col = "gray40")
+abline(v = c(mean(counts[counts$Site=="Meadow","LongestLeaf_cm_2018"], na.rm = TRUE),
+             mean(counts[counts$Site=="Meadow","LongestLeaf_cm_2019"], na.rm = TRUE),
+             mean(counts[counts$Site=="Meadow","LongestLeaf_cm_2020"], na.rm = TRUE)
+             ), 
+       lty = c(1, 2, 3), lwd = 2, col = "gray40")
 #lines(density(counts[counts$Site=="Meadow","LongestLeaf_cm_2019"], na.rm = TRUE), lty = 2, lwd = 2, col = "#66A61E")
 polygon(density(counts[counts$Site=="Meadow","LongestLeaf_cm_2018"], na.rm = TRUE), col = add.alpha(pal[5],.5), border = pal[5])
 polygon(density(counts[counts$Site=="Meadow","LongestLeaf_cm_2019"], na.rm = TRUE), col = add.alpha(pal[5],.5), border = pal[5], lty = 2)
+polygon(density(counts[counts$Site=="Meadow","LongestLeaf_cm_2020"], na.rm = TRUE), col = add.alpha(pal[5],.5), border = pal[5], lty = 3)
 mtext("Plant Size (cm)", side = 1, line = 2.25, font = 2)
 
 
@@ -268,10 +309,15 @@ plot(x = NA, y = NA,
      ylab = c(""),
      xlim = c(0,45), 
      main = c("Unnamed Creek"))
-abline(v = c(mean(counts[counts$Site=="Unnamed Creek","LongestLeaf_cm_2018"], na.rm = TRUE),mean(counts[counts$Site=="Unnamed Creek","LongestLeaf_cm_2019"], na.rm = TRUE)), lty = c(1,2), lwd = 2, col = "gray40")
+abline(v = c(mean(counts[counts$Site=="Unnamed Creek","LongestLeaf_cm_2018"], na.rm = TRUE),
+             mean(counts[counts$Site=="Unnamed Creek","LongestLeaf_cm_2019"], na.rm = TRUE),
+             mean(counts[counts$Site=="Unnamed Creek","LongestLeaf_cm_2020"], na.rm = TRUE)
+             ), 
+       lty = c(1,2,3), lwd = 2, col = "gray40")
 # lines(density(counts[counts$Site=="Unnamed Creek","LongestLeaf_cm_2019"], na.rm = TRUE), lty = 2, lwd = 2, col = "#E6AB02")
 polygon(density(counts[counts$Site=="Unnamed Creek","LongestLeaf_cm_2018"], na.rm = TRUE), col = add.alpha(pal[6],.5), border = pal[6])
 polygon(density(counts[counts$Site=="Unnamed Creek","LongestLeaf_cm_2019"], na.rm = TRUE), col = add.alpha(pal[6],.5), border = pal[6], lty = 2)
+polygon(density(counts[counts$Site=="Unnamed Creek","LongestLeaf_cm_2020"], na.rm = TRUE), col = add.alpha(pal[6],.5), border = pal[6], lty = 3)
 
 
 #### Make reproductive output-by-size plot ####
@@ -388,6 +434,7 @@ plot(counts$No_Capsules_2019 ~ counts$LongestLeaf_cm_2019,
 #identify those plants that were reproductive in 2018 and also alive in 2019!
 zombie <- counts %>% 
   filter(Flowering_2018==1, Alive_2019==1)
+
 #19 individuals that survived! (out of 317)--5.99% chance of surviving after flowering
 sum(counts$Flowering_2018==1, na.rm = TRUE)
 
@@ -1194,8 +1241,8 @@ plotA <- ggplot() +
 
 
 #### Make figure showing all preliminary vital rate plots in one panel ####
-require(ggplot2)
-require(ggpubr) #package used to put ggplots in one panel
+library(ggplot2)
+library(ggpubr) #package used to put ggplots in one panel
 theme_set(theme_pubr())
 
 # plots are plotA, plotB, plotC, and plotD
@@ -1205,3 +1252,114 @@ VitalRates <- ggarrange(plotA, plotB, plotC, plotD,
 
 ##---- VitalRatesFigure
 VitalRates
+
+
+
+
+# reformat 'counts' data.frame --------------------------------------------
+
+temp_1 <- counts %>% 
+  select(Location, Site,Plot_ID, Quadrant, ID, X_cm, Y_cm, Alive_2018, Alive_2019, Alive_2020) %>%
+  pivot_longer(
+             cols = 8:10,
+             names_to = c(".value", "Year"),
+             names_sep = "_", 
+             values_drop_na = TRUE
+             )
+
+
+temp_2 <- counts %>% 
+  select(Location, Site,Plot_ID, Quadrant, ID, X_cm, Y_cm, LongestLeaf_cm_2018, LongestLeaf_cm_2019, LongestLeaf_cm_2020) %>% 
+  pivot_longer(
+    cols = 8:10,
+    names_to = c(".value", "Year"),
+    names_pattern = "([[:print:]]{14})_([[:digit:]]{4})", 
+    values_drop_na = FALSE
+  )
+             
+temp_3 <- counts %>% 
+  select(Location, Site,Plot_ID, Quadrant, ID, X_cm, Y_cm, Bolting_2018, Bolting_2019, Bolting_2020) %>% 
+  pivot_longer(
+    cols = 8:10,
+    names_to = c(".value", "Year"),
+    names_sep = "_", 
+    values_drop_na = FALSE
+  )
+
+
+temp_4 <- counts %>% 
+  select(Location, Site,Plot_ID, Quadrant, ID, X_cm, Y_cm, Flowering_2018, Flowering_2019, Flowering_2020) %>% 
+  pivot_longer(
+    cols = 8:10,
+    names_to = c(".value", "Year"),
+    names_sep = "_", 
+    values_drop_na = FALSE
+  )
+
+temp_5 <- counts %>% 
+  select(Location, Site,Plot_ID, Quadrant, ID, X_cm, Y_cm, No_Capsules_2018, No_Capsules_2019, No_Capsules_2020) %>% pivot_longer(
+    cols = 8:10,
+    names_to = c(".value", "Year"),
+    names_pattern = "([[:print:]]{11})_([[:digit:]]{4})", 
+    values_drop_na = FALSE
+  )
+
+temp_6 <- counts %>% 
+  select(Location, Site,Plot_ID, Quadrant, ID, X_cm, Y_cm, Stem_Herbivory_2018, Stem_Herbivory_2019, Stem_Herbivory_2020)%>% pivot_longer(
+    cols = 8:10,
+    names_to = c(".value", "Year"),
+    names_pattern = "([[:print:]]{14})_([[:digit:]]{4})", 
+    values_drop_na = FALSE
+  )
+
+temp_7 <- counts %>% 
+  select(Location, Site,Plot_ID, Quadrant, ID, X_cm, Y_cm, Invert_Herbivory_2018, Invert_Herbivory_2019, Invert_Herbivory_2020)%>% pivot_longer(
+    cols = 8:10,
+    names_to = c(".value", "Year"),
+    names_pattern = "([[:print:]]{16})_([[:digit:]]{4})", 
+    values_drop_na = FALSE
+  )
+
+temp_8 <- counts %>% 
+  select(Location, Site,Plot_ID, Quadrant, ID, X_cm, Y_cm, LeafSpots_2018, LeafSpots_2019, LeafSpots_2020) %>% 
+  pivot_longer(
+    cols = 8:10,
+    names_to = c(".value", "Year"),
+    names_sep = "_", 
+    values_drop_na = FALSE
+  )
+
+temp_9 <- counts %>% 
+  select(Location, Site,Plot_ID, Quadrant, ID, X_cm, Y_cm, Notes_2018, Notes_2019, Notes_2020) %>% 
+  pivot_longer(
+    cols = 8:10,
+    names_to = c(".value", "Year"),
+    names_sep = "_", 
+    values_drop_na = FALSE
+  )
+
+tempAll <- temp_1 %>% 
+  left_join(temp_2, by = c("Location", "Site", "Plot_ID", "Quadrant", "ID", 
+                           "X_cm", "Y_cm", "Year")) %>% 
+   left_join(temp_3, by = c("Location", "Site", "Plot_ID", "Quadrant", "ID", 
+                            "X_cm", "Y_cm", "Year")) %>% 
+   left_join(temp_4, by = c("Location", "Site", "Plot_ID", "Quadrant", "ID", 
+                            "X_cm", "Y_cm", "Year")) %>% 
+   left_join(temp_5, by = c("Location", "Site", "Plot_ID", "Quadrant", "ID", 
+                            "X_cm", "Y_cm", "Year")) %>% 
+   left_join(temp_6, by = c("Location", "Site", "Plot_ID", "Quadrant", "ID", 
+                            "X_cm", "Y_cm", "Year")) %>% 
+   left_join(temp_7, by = c("Location", "Site", "Plot_ID", "Quadrant", "ID", 
+                            "X_cm", "Y_cm", "Year")) %>% 
+   left_join(temp_8, by = c("Location", "Site", "Plot_ID", "Quadrant", "ID", 
+                            "X_cm", "Y_cm", "Year")) %>% 
+   left_join(temp_9, by = c("Location", "Site", "Plot_ID", "Quadrant", "ID", 
+                            "X_cm", "Y_cm", "Year")) 
+## save the 'long' form data to file
+write.csv(tempAll, "./COBP_LongData_08_23_21.csv", row.names = FALSE)
+  
+data <- read.csv("./COBP_LongData_08_23_21.csv")
+ggplot(data = data) +
+  geom_point(aes(x = X_cm, y = Y_cm, col = Quadrant, pch = as.factor(Bolting))) +
+  facet_wrap(~Year) +
+  theme_classic()
