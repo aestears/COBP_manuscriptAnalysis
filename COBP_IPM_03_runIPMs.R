@@ -113,6 +113,84 @@ simple_ipm <- init_ipm(sim_gen   = "simple",
     iterations = 100
     )
 
+#### deterministic, density-dependent IPM using only continuous stages ####
+p.estab.simple = mean(simple_estabs$p_estab, na.rm = TRUE)
+
+data_list <- list(
+  g_int     = coef(sizeMod_)[1],
+  g_slope   = coef(sizeMod)[2],
+  g_sd      = summary(sizeMod)$sigma,
+  s_int     = coef(survMod)[1],
+  s_slope   = coef(survMod)[2],
+  p_b_int   = coef(flwrMod_t)[1], #probability of flowering
+  p_b_slope = coef(flwrMod_t)[2],
+  p_b_slope_2 = coef(flwrMod_t)[3],
+  b_int   = coef(seedMod_t)[1], #seed production
+  b_slope = coef(seedMod_t)[2],
+  c_o_mu    = coef(recMod), #recruit size distribution
+  c_o_sd    = summary(recMod)$sigma,
+  p_estab = p.estab.simple 
+)
+
+# inital population state
+init_size_state <- pnorm(rnorm(500, mean = mean(ht, na.rm = TRUE), sd = sd(ht, na.rm = TRUE)), mean = mean(ht, na.rm = TRUE), sd = sd(ht, na.rm = TRUE))
+
+simple_ipm <- init_ipm(sim_gen   = "simple", 
+                       di_dd     = "di", 
+                       det_stoch = "det") %>% 
+  define_kernel(
+    name          = "P",
+    formula       =(1-p_b.) * s. * g.,
+    
+    s.            = 1/(1 + exp(-(s_int + s_slope * size_1))),
+    g.            = dnorm(size_2, g_mu., g_sd), 
+    g_mu.         = g_int + g_slope * size_1, 
+    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+    
+    family        = "CC",
+    data_list     = data_list,
+    states        = list(c('size')),
+    uses_par_sets = FALSE,
+    evict_cor     = TRUE,
+    evict_fun     = truncated_distributions("norm", "g.")
+  ) %>% 
+  define_kernel(
+    name          = "F", 
+    formula       = p_b. * b. * p_estab. * c_o.,
+    
+    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+    b.            = exp(b_int + b_slope * size_1),
+    c_o.          = dnorm(size_2, c_o_mu, c_o_sd),
+    p_estab.       = p_estab,
+    
+    family        = "CC",
+    data_list     = data_list,
+    states        = list(c('size')),
+    uses_par_sets = FALSE,
+    evict_cor     = TRUE,
+    evict_fun     = truncated_distributions("norm", "c_o.")
+  ) %>% 
+  define_impl(
+    make_impl_args_list(
+      kernel_names = c("P", "F"), 
+      int_rule = rep("midpoint", 2),
+      state_start = rep("size", 2), 
+      state_end = rep("size", 2)
+    )
+  ) %>% 
+  define_domains(
+    size = c(
+      min(dat$log_LL_t, na.rm = TRUE) * .8, # lower bound (L)
+      max(dat$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
+      500 # number of mesh points
+    )
+  ) %>% 
+  define_pop_state(
+    n_size = runif(500)
+  ) %>% 
+  make_ipm(
+    iterations = 100
+  )
 #### Deterministic, density-independent IPM for all data ####
 # vital-rate model names: survMod, sizeMod, seedMod_t, flowerMod_t, recD, p.estab.est, outSB.est, staySB.est, goSB.est, goSdlng.est 
 
