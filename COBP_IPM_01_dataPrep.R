@@ -117,7 +117,7 @@ viab.rt.Burgess <- mean(c(.79,.7,.63))
 # reduce by 20%
 viab.rt <-viab.rt.Burgess*.8
 
- #### calculate the starting number of seeds in the seedbank####
+#### calculate the starting number of seeds in the seedbank ####
 # data from COBPGreenhouseSeedbankStudyData.csv
 # the no. of seeds that germinated for sample of each plot ()
 seedStudyGerms <- c(5,4,3,0.01,0.01,1,0.01,0.01,0.01,9,4,9,0,1,1,8,20,1)
@@ -157,7 +157,6 @@ seeds_est_site[seeds_est_site$seedbank_est < 0, "seedbank_est"] <- 100
 # formula = (germs*(1-germ.rate) - mean no. of seeds produced in previous year)
 seedBank_est <- mean(seeds_est$coreSeeds_est - seeds_est$SeedRain_avg)
 
-
 ## calculate total seedling no. by site (NOT mean seedling no.)--mean for each plot accross all years, then summed values for each site
 seedlings_site <- seedlings %>% 
   group_by(Plot_ID, Site) %>% 
@@ -169,6 +168,7 @@ seedlings_site <- seedlings %>%
 # change seedbank estimate that are negative to small positive numbers
 seeds_est_faked <- seeds_est 
 seeds_est_faked[seeds_est_faked$seedbank_est < 0, "seedbank_est"] <- 10
+
 #### make d.f.s to illustrate the number of seeds/seedling/germs, etc. ####
 plots <- unique(dat$Plot_ID)
 years <- unique(dat$Year)
@@ -238,3 +238,7 @@ for (i in 1:length(plots)) {
 
 # put in a 'discrete' stage d.f
 discreteDat <- seeds.out
+
+# write the discreteDat d.f to file
+write.csv(x = discreteDat, 
+          file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
