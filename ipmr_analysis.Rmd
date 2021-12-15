@@ -1,0 +1,422 @@
+---
+title: "An Integral Projection Model for *Oenothera coloradensis* using the `ipmr` R package"
+author: "Alice Stears"
+date: "12/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+#load packages
+library(tidyverse)
+library(ipmr)
+```
+## Background
+*Oenothera coloradensis* is a monocarpic perennial herb that occurs in riparian and wetland habitats in southeast Wyoming, southwest Nebraska, and northern Colorado. It was listed as "threatened" under the Endangered Species Act until December, 2019. It was originally listed because it is naturally rare, and even though it's ESA designation has since been removed, this species is still very uncommon. One chapter of my dissertation is using demographic methods to investigate the mechanisms that allow populations of this rare species to persist. I am building an integral projection model (IPM) for this species, and can use results from this model to test for the existence of several different persistence mechanisms. 
+
+I have three consecutive years of pre-reproductive census data for this species, which includes survival status, size (longest leaf), reproductive status, and reproductive output for each year. I also have counts of 'seedlings' in each year (individuals less than 3 cm in leaf length), and estimates of seed germination rate and seed vitality rate. I am working on building an IPM that includes a continuous stage for adult individuals, and two discrete stages for seedlings and the seedbank. I was able to build a test IPM using only the continuous stage by hand using code from Ellner and Rees, 2016. However, the process for creating an IPM by hand with two discrete stages as well as a continuous stage seemed daunting, so I've tried to use the `ipmr` package. I've followed the `ipmr` vignettes and was able to create a simple, continuous-only IPM in impr that returns the same results as the continuous-only IPM I built by hand. However, because the package is new and there is not a published example of an IPM with two discrete stages, I'm not as confident as I'd like that I've specified the general, multi-stage model correctly. I would greatly appreciate you taking a quick look at the model, and if possible confirming that I've specified it correctly. I've included a life-cycle diagram for this species, the IPM kernel functions, and code for a general, discrete IPM with one continuous and two discrete stages I've created using `ipmr`. This model doesn't include density dependence and environmental co-variates, since I've been able to follow the `ipmr` vignettes to incorporate these elements. I'm primarily interested in confirming that I've written the code for the demographic functions correctly. 
+
+### *Oenothera coloradensis* life-cycle diagram
+![Figure of the O. coloradensis life-cycle, with transitions labeled](/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/COBP_analysis/images/COBP_lifecyclediagram.jpg)
+
+### Functions in the IPM kernel
+**Distribution of size of individuals in year *t+1* (continuous stage):**   
+New recruits from the seedling stage + growth and survival kernel   
+$$n(z',t+1) = S(t)p_{estab}c_o(z') + \int_{L}^{U}(1-P_b(z))s(z)G(z',z)n(z,t)dz $$
+**Size of the seedling stage (discrete stage):**    
+New seedlings that germinate out of the seedbank + new seedlings that came from seeds produced by adult plants in the previous year (i.e. seeds that skipped the seedbank)
+$$S(t+1) = B(t)outSB + goSdlng\int_{L}^{U}P_b(z)b(z)n(z,t)dz $$
+**Seedbank (discrete stage):**   
+seeds that stay in the seedbank + seeds that are added to the seedbank by seed production from adult plants   
+$$B(t+1) = B(t)staySB+goSB\int_{L}^{U}P_b(z)b(z)n(z,t)dz $$
+
+### Make vital rate models 
+These are simple models that do not include density dependence or environmental covariates, although the final models will contain these elements. 
+
+**Load census data**
+```{r}
+# load continuous stage data
+dat <- read.csv("../../Processed_Data/COBP_long_CURRENT.csv")
+```
+
+**Survival ($s(z)$)**
+```{r fig.width=5, fig.height=4}
+## subset the data to exclude flowering individuals
+survDat <- dat[dat$flowering==0 | is.na(dat$flowering),]
+
+## logistic glm with log-transformed size_t
+survMod <- glm(survives_tplus1 ~ log_LL_t , data = survDat, family = binomial)
+summary(survMod)
+## plot model results 
+plot(survives_tplus1 ~ log_LL_t, data = survDat)
+newdata <- data.frame("log_LL_t" = seq(from = min(survDat$log_LL_t, na.rm = TRUE), 
+               to = max(survDat$log_LL_t, na.rm = TRUE),
+               length.out = 100))
+lines(x = newdata$log_LL_t, y = predict(object = survMod, newdata =  newdata, type = "response"), col = "red")
+```
+
+**Growth ($G(z',z)$)**
+```{r fig.width=5, fig.height=4}
+# can use the full dataset
+## lm w/ log-transformed size_t and size_t+1
+sizeMod <- lm(log_LL_tplus1 ~ log_LL_t , data = dat)
+summary(sizeMod)
+## plot model results
+plot(log_LL_tplus1 ~ log_LL_t, data = dat)
+newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE), 
+               to = max(dat$log_LL_t, na.rm = TRUE),
+               length.out = 100))
+lines(x = newdata$log_LL_t, y = predict(object = sizeMod, newdata =  newdata), col = "red")
+```
+
+**Number of seeds produced, according to plant size ($b(z)$)**
+```{r fig.width=5, fig.height=4}
+ ## use only plants that flowered 
+ seedDat <- dat[dat$flowering==1,]
+## fit poisson glm (for count data)
+seedMod_t <- glm(Num_seeds ~ log_LL_t , data = seedDat, family = poisson)
+summary(seedMod_t)
+## plot model results
+plot(Num_seeds ~ log_LL_t, data = seedDat)
+newdata <- data.frame("log_LL_t" = seq(from = min(seedDat$log_LL_t, na.rm = TRUE), 
+                                       to = max(seedDat$log_LL_t, na.rm = TRUE),
+                                       length.out = 100))
+lines(x = newdata$log_LL_t, y = predict(object = seedMod_t, newdata =  newdata, type = "response"), col = "red")
+```
+
+**Flowering probability ($p_b(z)$)**
+```{r fig.width=5, fig.height=4}
+## logistic glm with log-transformed size_t
+flwrMod_t <- glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat, family = binomial)
+summary(flwrMod_t)
+## plot model results 
+plot(flowering ~ log_LL_t, data = dat)
+newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE), 
+                                       to = max(dat$log_LL_t, na.rm = TRUE),
+                                       length.out = 100))
+lines(x = newdata$log_LL_t, y = predict(object = flwrMod_t, newdata =  newdata, type = "response"), col = "red")
+```
+
+**Distribution of recruit size ($c_o(z')$)**
+```{r fig.width=5, fig.height=4}
+## subset the data
+recD <- dat[dat$age == 0 & is.na(dat$age) == FALSE,]
+
+recMod <- lm(log_LL_t ~ 1, data = recD)
+summary(recMod)
+
+hist(recD$log_LL_t)
+abline(v = recMod$coefficients, col = "blue", lwd = 2)
+```
+
+**Probability of a seedling in year *t* establishing to a rosette in year *t+1* ($p_{estab}$)**
+```{r message=FALSE}
+p.estab.est <- 0.5197184
+```
+
+**Get germination rate and rate of seed viability maintenance**
+```{r}
+## germination rate
+germ.rt <- 0.08 
+
+## seed viability rate 
+viab.rt <- 0.71
+```
+
+**Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1 ($outSB$)**
+```{r}
+outSB.est <-   germ.rt
+```
+
+**Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1 ($staySB$)**
+```{r}
+## seed viability rate  
+staySB.est <- (1-germ.rt)*viab.rt
+```
+
+**Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1 ($goSB$)**
+```{r}
+## 
+goSB.est <- (1 - germ.rt)*viab.rt
+```
+
+**Probability that a seed from a plant in year t will go directly to the seedling stage ($goSdlng$)**
+```{r}
+## use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
+goSdlng.est <- germ.rt
+```
+
+### Implement the IPM using `ipmr`
+**Set up the parameter list**
+```{r}
+data_list <- list(
+  g_int     = coef(sizeMod)[1],
+  g_slope   = coef(sizeMod)[2],
+  g_sd      = summary(sizeMod)$sigma,
+  s_int     = coef(survMod)[1],
+  s_slope   = coef(survMod)[2],
+  p_b_int   = coef(flwrMod_t)[1], #probability of flowering
+  p_b_slope = coef(flwrMod_t)[2],
+  p_b_slope_2 = coef(flwrMod_t)[3],
+  b_int   = coef(seedMod_t)[1], #seed production
+  b_slope = coef(seedMod_t)[2],
+  c_o_mu    = coef(recMod), #recruit size distribution
+  c_o_sd    = summary(recMod)$sigma,
+  goSdlng   = goSdlng.est, # Probability that non-seedbank seeds will germinate into seedlings in year t+1
+  staySB = staySB.est, # Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
+  goSB = goSB.est, # probability that a seed produced by an adult plant in year t will enter the seedbank
+  outSB = outSB.est, # probability that a seedbank seed will germinate to a seedling in year t+1
+  p_estab = p.estab.est # probability that a seedling will establish into a rosette in t+1
+)
+```
+
+**Set up helper-functions to pass to the model**
+```{r}
+inv_logit <- function(lin.pred) {
+  1/(1 + exp(-(lin.pred)))
+}
+```
+
+**Make the IPM kernels**
+```{r}
+general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
+                        di_dd = "di", # make it density independent
+                        det_stoch = "det") %>% # make it deterministic
+  define_kernel(
+    
+    name          = "P", # growth and survival kernel
+    
+    formula       = (1-p_b.) * s. * g. * d_size,
+    
+    family        = "CC",
+    
+    g.            = dnorm(size_2, g_mu., g_sd),
+    g_mu.          = g_int + g_slope * size_1,
+    s.            = inv_logit(lin.pred = (s_int + s_slope * size_1)),
+    p_b.          = inv_logit(lin.pred = (p_b_int + p_b_slope * size_1 + p_b_slope_2 * I(size_1^2))),
+    data_list     = data_list,
+    states        = list(c('size')),
+    uses_par_sets = FALSE,
+    evict_cor     = TRUE,
+    evict_fun     = truncated_distributions('norm', 'g.')
+) %>%
+  define_kernel(
+    
+    name          = "leave_seedlings", ## leave seedling stage and go to rosette stage
+    formula       = p_estab. * c_o. * d_size,
+    
+    family        = 'DC',
+    p_estab.      = p_estab,
+    c_o.          = dnorm(size_2, c_o_mu, c_o_sd),
+    data_list     = data_list,
+   
+    states        = list(c('size', "s")),
+    uses_par_sets = FALSE,
+    evict_cor     = TRUE,
+    evict_fun     = truncated_distributions('norm','c_o.')
+) %>%
+  define_kernel(
+    
+    name    = "repro_to_seedlings",
+   
+    formula       = (goSdlng) * (p_b. * b. * d_size),
+
+    family        = "CD",
+    
+    goSdlng.      = goSdlng.,
+    p_b.          = inv_logit(lin.pred = (p_b_int + p_b_slope * size_1 + p_b_slope_2 * size_1^2)),
+    b.            = exp(b_int + b_slope * size_1),
+    data_list     = data_list,
+    states        = list(c('size', 's')),
+    uses_par_sets = FALSE,
+    evict_cor     = FALSE
+
+) %>%
+  define_kernel(
+    
+    name          = 'seedbank_to_seedlings',
+    
+    formula       = outSB.,
+    
+    family        = 'DD',
+    outSB.        = outSB,
+    data_list     = data_list,
+    
+    states        = list(c('b', 's')),
+    uses_par_sets = FALSE,
+    evict_cor = FALSE
+    
+  ) %>%
+  define_kernel(
+    
+    name    = "stay_seedbank",
+   
+    formula       = staySB.,
+    
+    family        = "DD",
+    staySB.        = staySB,
+    data_list     = data_list,
+    states        = list(c('b')),
+    uses_par_sets = FALSE,
+    evict_cor = FALSE
+    
+  ) %>%
+  define_kernel(
+    
+    name          = 'repro_to_seedbank',
+    
+    formula       = (goSB.) * (p_b. * b. * d_size),
+    
+    family        = 'CD',
+    goSB.          = goSB, 
+    p_b.          = inv_logit(lin.pred = (p_b_int + p_b_slope * size_1 + p_b_slope_2 * size_1^2)),
+    b.            = exp(b_int + b_slope * size_1),
+    data_list     = data_list,
+    
+    states        = list(c('b', 'size')),
+    uses_par_sets = FALSE,
+    evict_cor = FALSE
+) 
+```
+
+**Define the transitions between kernels**
+```{r}
+general_ipm <- general_ipm %>%
+  define_impl(
+    make_impl_args_list(
+      kernel_names = c("P", "leave_seedlings", "repro_to_seedlings", "seedbank_to_seedlings", "stay_seedbank", "repro_to_seedbank"),
+      int_rule     = c(rep("midpoint", 6)),
+      state_start    = c('size', "s", "size", "b", "b", "size"),
+      state_end      = c("size", "size", "s", "s", "b", "b")
+    )
+  )
+```
+
+**Define the limits of size and starting population states**
+```{r}
+# lower limit of size
+L <- 1.09
+# upper limit of size
+U <- 3.66
+# number of break-points
+n <- 500
+
+set.seed(2312)
+
+init_pop_vec   <- runif(500) # initial vector for the continuous stage population
+
+init_seed_bank <-  17144 # average estimated seedbank size / plot
+
+init_seedlings <- 86 # average estimated number of seedlings/plot
+```
+
+**Run the IPM**
+```{r}
+general_ipm <- general_ipm %>%
+  define_domains(
+    
+    # We can pass the variables we created above into define_domains
+    
+    size = c(L, U, n),
+    
+  ) %>%
+  define_pop_state(
+    
+    # We can also pass them into define_pop_state
+    
+    pop_vectors = list(
+      n_size = init_pop_vec,
+      n_b  = init_seed_bank,
+      n_s  = init_seedlings 
+    )
+  ) %>%
+  make_ipm(iterations = 100,
+           usr_funs = list(inv_logit   = inv_logit), return_main_env = TRUE )
+```
+
+### Visualize the IPM kernel
+```{r}
+## make an image of the IPM
+## first have to make a mega-kernel
+mega_mat <- make_iter_kernel(ipm = general_ipm, 
+                             mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P),
+                               )
+## check to make sure I constructed the mega-kernel correctly (should be nearly equal values)
+Re(eigen(mega_mat[[1]])$values[1]) - lambda(general_ipm)
+```
+
+```{r}
+## visualize the full kernel 
+## define the meshpoints 
+meshpts <- seq(from = L, to = U, length = 500)
+## set up the palette
+pal <- hcl.colors(n = 100, palette = "Heat 2", rev = TRUE)
+## plot the continuous part of the kernel (leave out first two rows and cols that correspond to the discrete stages)
+
+## make the entire figure--lattice plot?
+graphics::layout(mat = matrix(c(1,4, 7, 2, 5, 8, 3, 6, 9),nrow = 3, ncol = 3), widths = c(1.5,1.5,6),heights = c(6,1.5,1.5))
+## B(t+1)
+par(mar = c(3,3,3,1))
+image(t(mega_mat$mega_matrix[1,3:502]^.1), xaxt = "n", yaxt = "n",
+      main = "B(t+1)",
+      col = pal[(round(min((mega_mat$mega_matrix[1,3:502])^.1),2)*100): 
+                  (round(max((mega_mat$mega_matrix[1,3:502])^.1),2)*100)]) 
+mtext(side = 1, text  = c("continous to \nseedbank"), line = -1, cex = .75)
+## S(t+1)
+par(mar = c(3,1,3,1))
+image(t(mega_mat$mega_matrix[2,3:502]^.1), xaxt = "n", yaxt = "n",
+      main = "S(t+1)",
+      col = pal[(round(min((mega_mat$mega_matrix[2,3:502])^.1),2)*100): 
+                  (round(max((mega_mat$mega_matrix[2,3:502])^.1),2)*100)]) 
+mtext(side = 1, text  = c("continous to \nseedlings"), line = -1, cex = .75)
+## K matrix
+par(mar = c(3,3,3,3)
+    ,mgp = c(1.75,.5,0)
+    )
+image(x = meshpts, y = meshpts, t(mega_mat$mega_matrix[3:502,3:502])^.1,
+      xlab = "n(z,t); log(cm)", ylab = "n(z',t+1); log(cm)", 
+      main = "Continuous Stage (t+1)",
+      col = pal[(round(min( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100): (round(max( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100)]
+      ) ## get the correct values for the color ramp that correspond to the actual probabilities in the entire matrix
+text(x = 3.8, y = 2.25, c("Continuous Stage (t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
+abline(a = 0, b = 1, lty = 2)
+contour(x = meshpts, y = meshpts, 
+        t(mega_mat$mega_matrix[3:502,3:502]), 
+        add = TRUE, drawlabels = TRUE, nlevels = 10, col = "grey30")
+# seedlings to seedbank
+par(mar = c(1,3,1,1))
+image(as.matrix(0), xaxt = "n", yaxt = "n", col = "white") 
+mtext(side = 1, text  = c("can't go from \nseedling \nto seedbank"), line = -1, cex = .75)
+# seedlings to seedlings
+par(mar = c(1,1,1,1))
+image(as.matrix(0), xaxt = "n", yaxt = "n",  col = "white") 
+mtext(side = 1, text  = c("can't stay in \nseedlings"), line = -1, cex = .75)
+#S(t)
+par(mar = c(1,3,1,3))
+image(as.matrix(mega_mat$mega_matrix[3:502,2]^.1), yaxt = "n", xaxt = "n",
+        col = pal[(round(min( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100): 
+                    (round(max( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100)]) 
+text(x = 1.05,y = .5, c("S(t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
+mtext(side = 1, text  = c("seedling to continuous stage"), line = -1, cex = .75)
+## plot the staySB probability
+par(mar = c(3,3,1,1))
+image(as.matrix(mega_mat$mega_matrix[1,1]^.1), xaxt = "n", yaxt = "n",
+      col = pal[round(max(mega_mat$mega_matrix[1,1]^.1),2)*100])
+mtext(side = 1, text  = c("stay in \nseedbank"), line = -1, cex = .75)
+## plot the seedbank to seedlings probability
+par(mar = c(3,1,1,1))
+image(as.matrix(t(mega_mat$mega_matrix[2,1])^.1), xaxt = "n", yaxt = "n",
+      col = pal[round(max(t(mega_mat$mega_matrix[2,1])^.1),2)*100])
+mtext(side = 1, text = c("seedbank to \nseedlings"), line = -1, cex = .75)
+## B(t)(is all zeros--can't transition to continuous stage from the seedbank)
+par(mar = c(3,3,1,3))
+image(t(mega_mat$mega_matrix[3:502,1]^.1), yaxt = "n", xaxt = "n",
+        col = pal[(round(min( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100): 
+                    (round(max( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100)]) 
+text(x = 1.1,y = .5, c("B(t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
+mtext(side = 1, text = c("can't go from seedbank to continuous stage"), line = -1, cex = .75)
+
+```

@@ -6,6 +6,7 @@
 #///////////////////////////////////////////////////////
 #### load packages ####
 library(lme4)
+library(MASS)
 #### load data from the previous script ####
 # (COBP_IPM_01_dataPrep.R)
 source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
@@ -35,14 +36,13 @@ newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE),
                                        to = max(dat$log_LL_t, na.rm = TRUE),
                                        length.out = 100))
 lines(x = newdata$log_LL_t, y = predict(object = sizeMod, newdata =  newdata), col = "red")
-
+lines(x = c(-1,4), y = c(-1,4), col = "darkgrey", lty = 2)
 
 ## Number of seeds produced, according to plant size ($b(z)$)
 # using size in current year (no. of seeds/plant, for those that flowered ~ size_t)
-# use only plants that flowered 
-seedDat <- dat[dat$flowering==1,]
-# fit poisson glm (for count data)
-seedMod_t <- glm(Num_seeds ~ log_LL_t , data = seedDat, family = poisson)
+seedDat <- dat[dat$flowering == 1,]
+# fit a negative binomial glm (poisson was overdispersed)
+seedMod_t <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat)
 summary(seedMod_t)
 # plot model results
 plot(Num_seeds ~ log_LL_t, data = seedDat)
@@ -80,22 +80,50 @@ p.estab.est <- sum(discreteDat$Recruit_tplus1)/sum(discreteDat$Seedling_t)
   #sum(estabs$P_estab, na.rm = TRUE)/sum(is.na(estabs$P_estab)==FALSE)
 
 ## Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1 ($outSB$)
-outSB.est <- sum(discreteDat$Seedling_tplus1)/sum(discreteDat$SeedBank_t)
-  #germ.rt
+outSB.est <- germ.rt
 
 ## Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1 ($staySB$)
 # seed viability rate * (1-germination rate)
-staySB.est <- sum(discreteDat$SeedBank_tplus1)/sum(discreteDat$SeedBank_t)
-  # (1-germ.rt)*viab.rt
+staySB.est <- (1-germ.rt)*viab.rt
 
 ## Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1 ($goSB$)
-goSB.est <- sum(discreteDat[discreteDat$NewSeeds_t == 1, "SeedBank_tplus1"])/sum(discreteDat$NewSeeds_t)
-  # (1 - germ.rt)*viab.rt
+goSB.est <- (1 - germ.rt)*viab.rt
 
 ## Probability that a seed from a plant in year t will go directly to the seedling stage ($goSdlng$)
 # use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
+
 goSdlng.est <- sum(discreteDat[discreteDat$NewSeeds_t == 1, "Seedling_tplus1"])/sum(discreteDat$NewSeeds_t)
   # germ.rt
+
+#### Vital Rate Models for Deterministic, density-dependent IPM with all data####
+### Make vital rate models 
+## Survival ($s(z)$)
+# logistic glm with log-transformed size_t
+survMod_dd <- glm(survives_tplus1 ~ log_LL_t + N_all_t , data = survDat, family = binomial)
+summary(survMod_dd)
+# plot model results 
+
+## Growth ($G(z',z)$)
+# lm w/ log-transformed size_t and size_t+1
+sizeMod_dd <- lm(log_LL_tplus1 ~ log_LL_t + N_all_t , data = dat)
+summary(sizeMod_dd)
+
+## Number of seeds produced, according to plant size ($b(z)$)
+# using size in current year (no. of seeds/plant, for those that flowered ~ size_t)
+# fit poisson glm (for count data)
+seedMod_dd <- MASS::glm.nb(Num_seeds ~ log_LL_t + N_all_t, data = seedDat)
+summary(seedMod_dd)
+
+## Flowering probability ($p_b(z)$)
+# using size in current year (w/ squared term)
+# logistic glm with log-transformed size_t
+flwrMod_dd <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) + N_all_t, data = dat, family = binomial)))
+summary(flwrMod_dd)
+
+## Distribution of recruit size ($c_o(z')$)
+# fit the model
+recMod_dd <- lm(log_LL_t ~ 1 + N_all_t, data = recD)
+summary(recMod_dd)
 
 #### vital rate models for stochastic, density-independent IPM for all data with random effect for site and environmental covariates ####
 ### fit the vital rate models including environmental variables and random intercept for plot
@@ -112,7 +140,7 @@ survMod_env <- survMod_e_1
 
 ## Growth ($G(z',z)$)
 # lm w/ log-transformed size_t and size_t+1
-sizeMod_e <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = dat)
+sizeMod_e <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + precipWaterYr_cm_s + tMean_grow_C_s +  (1|Plot_ID), data = dat)
 summary(sizeMod_e)
 # remove soilTemp in winter and growing season
 sizeMod_e_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = dat)
@@ -124,10 +152,10 @@ sizeMod_env <- sizeMod_e_1
 # use only plants that flowered 
 # dat: seedDat
 # fit poisson glm (for count data)
-seedMod_e <- glmer(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = seedDat, family = poisson)
+seedMod_e <- lme4::glmer.nb(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = seedDat)
 summary(seedMod_e)
 # remove soil moisture, soil temp grow, soil temp winter (not significant)
-seedMod_e_1 <- glmer(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID) , data = seedDat, family = poisson)
+seedMod_e_1 <- lme4::glmer.nb(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID) , data = seedDat, family = poisson)
 summary(seedMod_e_1)
 seedMod_env <- seedMod_e_1
 
@@ -164,11 +192,12 @@ summary(recMod_env)
 #### Vital Rate Models for the Stochastic, density-dependent IPM for all data with random effect for site and environmental covariates ####
 ## Survival ($s(z)$)
 # data: survDat 
+dat$log_LL_t_s <- scale(dat$log_LL_t)
 # logistic glm with log-transformed size_t
 survMod_e_dd <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_t + (1|Plot_ID), data = survDat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(survMod_e_dd)
 # try excluding the precip data (is not significant in the previous model)
-survMod_e_dd_1 <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_grow_C_s + tMean_grow_C_s + N_all_t +  (1|Plot_ID),  data = survDat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+survMod_e_dd_1 <- glmer(survives_tplus1 ~ log_LL_t + tMean_grow_C_s + N_all_t +  (1|Plot_ID),  data = survDat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(survMod_e_dd_1)
 ## survMod_e_1 is the better fit, use this model
 survMod_env_dd <- survMod_e_dd_1
@@ -177,18 +206,18 @@ survMod_env_dd <- survMod_e_dd_1
 # lm w/ log-transformed size_t and size_t+1
 sizeMod_e_dd <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_t + (1|Plot_ID), data = dat)
 summary(sizeMod_e_dd)
-# remove soilTemp in winter and growing season
-sizeMod_e_dd_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + precipWaterYr_cm_s + N_all_t + (1|Plot_ID), data = dat)
+# remove soilTemp in winter and growing season; drop precip
+sizeMod_e_dd_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + N_all_t + (1|Plot_ID), data = dat)
 summary(sizeMod_e_dd_1)
 sizeMod_env_dd <- sizeMod_e_dd_1
 
 ## Number of seeds produced, according to plant size ($b(z)$)
 # data: seedDat 
 # fit poisson glm (for count data)
-seedMod_e_dd <- glmer(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s +  (1|Plot_ID), data = seedDat, family = poisson)
+seedMod_e_dd <- lme4::glmer.nb(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s +  N_all_t + (1|Plot_ID), data = seedDat, family = poisson)
 summary(seedMod_e_dd)
 # remove soil moisture, soil temp grow, soil temp winter (not significant)
-seedMod_e_dd_1 <- glmer(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s +  (1|Plot_ID) , data = seedDat, family = poisson)
+seedMod_e_dd_1 <- lme4::glmer.nb(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID) , data = seedDat, family = poisson)
 summary(seedMod_e_dd_1)
 ## use the final model w/ no density dependence
 seedMod_env_dd <- seedMod_e_dd_1
@@ -196,8 +225,11 @@ seedMod_env_dd <- seedMod_e_dd_1
 ## Flowering probability ($p_b(z)$)
 # using size in current year (w/ squared term)
 # logistic glm with log-transformed size_t
-flwrMod_e_dd <- glmer(flowering ~ log_LL_t + I(log_LL_t^2) + SoilMoisture_m3m3_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s +  (1|Plot_ID), data = dat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+flwrMod_e_dd <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  +  N_all_t + (1|Plot_ID), data = dat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(flwrMod_e_dd)
+# remove density dependence
+flwrMod_e_dd_1 <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  + (1|Plot_ID), data = dat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+summary(flwrMod_e_dd_1)
 # final model has no density dependence
 flwrMod_env_dd <- flwrMod_e_dd
 

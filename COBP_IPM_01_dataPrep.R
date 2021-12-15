@@ -9,7 +9,7 @@
 library(tidyverse)
 
 #### Load Data ####
-## load spatialized data, which we'll need for neighborhood calculations
+## load continuous data
 dat <- read.csv("../Processed_Data/COBP_long_CURRENT.csv")
 
 ## get seedling data
@@ -46,7 +46,6 @@ dat <- left_join(dat, soilTemp)
 # add the climate data (have mean values for each location)
 dat <- left_join(dat, Climate)
 
-#### transform variables ####
 # scale environmental variables
 dat$Year <- as.factor(dat$Year)
 dat$SoilMoisture_m3m3_s <- scale(dat$SoilMoisture_m3m3)
@@ -54,35 +53,7 @@ dat$SoilTemp_winter_C_s <- scale(dat$SoilTemp_winter_C)
 dat$SoilTemp_grow_C_s <- scale(dat$SoilTemp_grow_C)
 dat$tMean_grow_C_s <- scale(dat$tMean_grow_C)
 dat$precipWaterYr_cm_s <- scale(dat$precipWaterYr_cm)
-# make log-transformed size variables ####
-dat$log_LL_t <- log(dat$LongestLeaf_cm)
-dat$log_LL_tplus1 <- log(dat$longestLeaf_tplus1)
-dat$log_LL_tminus1 <- log(dat$longestLeaf_tminus1)
-# round capsule count numbers (that were modeled based on regression) to whole numbers 
-dat$Num_capsules <- round(dat$Num_capsules, digits = 0)
-# remove spaces from the 'site' column
-dat$Site <- str_replace(string = dat$Site, pattern = " ", replacement = "_")
 
-#### calculate population size for each plot  ####
-N_dat <- dat %>% 
-  group_by(Plot_ID, Year) %>% 
-  summarize("N_adults_t" = n())
-
-# add seedling and adult N values together
-N_dat <- seedlings %>% 
-  rename(N_seedlings_t = Seedlings_t) %>% 
-  mutate(Year = as.factor(Year)) %>% 
-  left_join(N_dat) %>% 
-  mutate(N_all_t = (N_seedlings_t + N_adults_t))
-# add the 'N' data to the 'dat' data.frame
-dat <- left_join(dat, N_dat)
-# scale density dependence variables
-dat$N_all_t_s <- scale(dat$N_all_t)
-
-#### get establishment/recruit size data ####
-# make a column in 'dat' that labels 'recruits' to the rosette stage
-dat$recruit <- 0
-dat[dat$age==0 & is.na(dat$age)==FALSE,"recruit"] <- 1
 # get the number of recruits/year 
 estabTemp <- dat %>% 
   dplyr::select(Plot_ID, Year, recruit) %>% 
@@ -124,29 +95,34 @@ seedStudyGerms <- c(5,4,3,0.01,0.01,1,0.01,0.01,0.01,9,4,9,0,1,1,8,20,1)
 # divide the seedcore germs by the germ rate to get the number of (seedbank + seed rain) seeds in each core
 seedStudyGerms.1 <- seedStudyGerms/germ.rt
 # convert the volume of the soil samples to the volume of the plots to get approx. number of (seedbank + seed rain) seeds in each plot
-# cores are 3cm in diameter and 2.5cm deep %%% NEED TO ACTUALLY CHECK THIS; THIS IS JUST A PLACEHOLDER %%%, and there are 20 of them/plot
-coreVol = ((pi*(3/2)^2)*2.5)*20 ## 753.98 cm^3 is the total volume of the soil cores
+# cores are 5.5cm in diameter and 3cm deep, and there are 20 of them/plot
+coreVol = ((pi*(5.5/2)^2)*2.5)*20 ## 1187.915 cm^3 is the total volume of the soil cores for one plot
 # calculate the volume of the first 3cm of soil in the plots
-plotVol = 200*200*2.5
+plotVol = 200*200*3
 # estimate the number of seeds in the plot
 seedsEst.all <- (plotVol*seedStudyGerms.1)/coreVol
-# total number of seeds produced in each plot in each year
+
+# total number of seeds produced by adult plants in each plot in each year
 seedsTemp <- aggregate(x = dat[,c("Num_seeds")], by = list("Plot_ID" = dat$Plot_ID,
                                                            "Year" = dat$Year, 
                                                            "Site" = dat$Site), FUN = sum, na.rm = TRUE)
+names(seedsTemp)[4] <- "Num_seeds"
+
 #get the mean seed rain in a year for each plot 
-seedRain.avg <- aggregate(x = seedsTemp$x, by = list("Plot_ID" = seedsTemp$Plot_ID, 
+seedRain.avg <- aggregate(x = seedsTemp$Num_seeds, by = list("Plot_ID" = seedsTemp$Plot_ID, 
                                                      "Site" = seedsTemp$Site), FUN = mean)
 # re-order the plot seedRain data to be in the same order as the seed core data
 seedRain.avg <- seedRain.avg[c(7:18,1:3,6,4:5),]
 # put all of this data into one d.f
 names(seedRain.avg)[3] <- "SeedRain_avg"
+# add seedbank estimates from the soil cores to this d.f
 seedRain.avg$coreSeeds_est <- seedsEst.all
+# put in a d.f called 'seeds_est'
 seeds_est <- seedRain.avg
-# get an estimate of seedbank size for each plot (soil core seed est. - seedRain)
-seeds_est$seedbank_est <- seeds_est$coreSeeds_est - seeds_est$SeedRain_avg
 # subtract the seedRain from the soilcore seed est to get an estimate of the size of the seedbank state in year t (B(t))
+seeds_est$seedbank_est <- seeds_est$coreSeeds_est - seeds_est$SeedRain_avg
 # aggregate to the site level (site-wide totals, NOT means)
+# get total number of seeds in the seedbank (estimated) for each site (only have one value, so need to extrapolate across years)
 seeds_est_site <- seeds_est %>% 
   group_by(Site) %>% 
   summarize(SeedRain_avg = sum(SeedRain_avg), 
@@ -154,10 +130,12 @@ seeds_est_site <- seeds_est %>%
             seedbank_est = sum(seedbank_est))
 # change the negative numbers to 100 %%% MAYBE SHOULD CHANGE THIS... JUST A TEMPORARY FIX%%%
 seeds_est_site[seeds_est_site$seedbank_est < 0, "seedbank_est"] <- 100
+
+# calculate a point-estimate of the mean seedbank size across all sites
 # formula = (germs*(1-germ.rate) - mean no. of seeds produced in previous year)
 seedBank_est <- mean(seeds_est$coreSeeds_est - seeds_est$SeedRain_avg)
 
-## calculate total seedling no. by site (NOT mean seedling no.)--mean for each plot accross all years, then summed values for each site
+## calculate average number of seedlings/year for each site (NOT mean seedling no.)--mean for each plot across all years, then summed values for each site
 seedlings_site <- seedlings %>% 
   group_by(Plot_ID, Site) %>% 
   summarise(Seedlings_t = mean(Seedlings_t)) %>% 
@@ -200,21 +178,21 @@ for (i in 1:length(plots)) {
                                                           rep_len(0, length.out = (n_newSeeds-n_newGoSB))), # could go into the seedbank (goSB) (1-germ.rt)*viab.rt
                                     "Seedling_tplus1" = c(rep_len(0, length.out = n_newGoSB), # 0 (went into seedbank)
                                                           rep_len(1, length.out = n_newGoSdlng), # 1 (became a seedling)
-                                                          rep_len(0, length.out = (n_newSeeds - (n_newGoSB + n_newGoSdlng)))), #1 (died) could go directly to the seedling stage (goSdlng) (germ.rt)
+                                                          rep_len(0, length.out = (n_newSeeds - (n_newGoSB + n_newGoSdlng)))), #1 (died) 
                                     "Seedling_t" = 0, "Recruit_tplus1" = 0)) 
     }
     # probability of establishing into a rosette in year t+1 (do for each plot, not each plot/year combo)
-    recruitRate_now <- mean(estabs[estabs$Plot_ID==plot_now,"P_estab"], na.rm = TRUE) # establishment rate
-    if (is.nan(recruitRate_now)) {
-      recruitRate_now <- NA
+    # get number of recruits in year t+1
+    if (year_now %in% c(2018, 2019)) {
+      n_recruits_tplus1 <- sum(dat[dat$Plot_ID == plot_now & dat$Year == as.numeric(as.character(year_now)) + 1,"recruit"], na.rm = TRUE)
+    } else if (year_now == 2020) {
+      n_recruits_tplus1 <- 0
     }
-    # get number of recruits
-    n_recruits_tplus1 <- sum(dat[dat$Plot_ID == plot_now & dat$Year == as.numeric(as.character(year_now)) + 1,"recruit"], na.rm = TRUE)
-    if (is.na(recruitRate_now) == TRUE & n_recruits_tplus1 > 0) {
-     recruitRate_now <- .99
-    }
-    n_seedlings_t <- round(n_recruits_tplus1/recruitRate_now, 0)
-    if (n_seedlings_t > 0 & is.na(n_seedlings_t) == FALSE) {
+    # get the number of seedlings in year t
+    n_seedlings_t <- deframe(seedlings[seedlings$Plot_ID == plot_now & 
+                                 seedlings$Year == year_now, "Seedlings_t"])
+    
+    if (n_seedlings_t > n_recruits_tplus1) {
       seeds_now <- rbind(seeds_now, 
                          data.frame("Year" = year_now, "Plot_ID" = plot_now, 
                                     "NewSeeds_t" = 0,
@@ -224,9 +202,21 @@ for (i in 1:length(plots)) {
                                     "Seedling_t" = rep_len(1, length.out = n_seedlings_t), 
                                     "Recruit_tplus1" = c(rep_len(1, length.out = n_recruits_tplus1),
                                                          rep_len(0, length.out = (n_seedlings_t - n_recruits_tplus1))
-                                    ))) 
-    } 
-    
+                                    )))   
+    } else if (n_seedlings_t <= n_recruits_tplus1) {
+      # adjust the number of seedlings to be the same as the number of recruits
+      n_seeds_adj <- (n_recruits_tplus1 + 1)
+      seeds_now <- rbind(seeds_now, 
+                         data.frame("Year" = year_now, "Plot_ID" = plot_now, 
+                                    "NewSeeds_t" = 0,
+                                    "SeedBank_t" = 0,
+                                    "SeedBank_tplus1" = 0,
+                                    "Seedling_tplus1" = 0,
+                                    "Seedling_t" = rep_len(1, length.out = n_seeds_adj), 
+                                    "Recruit_tplus1" = c(rep_len(1, length.out = n_recruits_tplus1),
+                                                         rep_len(0, length.out = (n_seeds_adj - n_recruits_tplus1))
+                                    )))   
+    }
     ## add to output d.f
     if (exists("seeds.out")) {
       seeds.out <- rbind(seeds.out, seeds_now)
