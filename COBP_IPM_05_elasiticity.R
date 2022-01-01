@@ -9,6 +9,7 @@ library(tidyverse)
 library(ipmr)
 #### load vital rate models from previous script ####
 load(file = "./analysis_scripts/ipm_results.RData")
+source(file = "./analysis_scripts/COBP_IPM_04_ellnerCodeSimpleIPMs.R")
 
 # lower limit of size in the ipm
 L = min(dat$log_LL_t, na.rm = TRUE) * .8
@@ -234,11 +235,10 @@ image(G.elas.z, main = paste0("elasticity of G(z',z); tot.elast. = ", round(sum(
 contour(G.elas.z, add = TRUE)
 dev.off()
 # calculate the damping ratio (to determine if the asymptotic rates are good approximations of transient dynamics)
-(damp=Re(eigen(mega.mat_det.di_proto$mega_matrix)$values[1])/Re(eigen(mega.mat_det.di_proto$mega_matrix)$values[2])) # damping ratio
+(damp <- Re(eigen(mega.mat_det.di_proto$mega_matrix)$values[1])/Re(eigen(mega.mat_det.di_proto$mega_matrix)$values[2])) # damping ratio
 # value is 1.3798, which is getting close to 1... meaning that the asymptotic rates/distributions aren't great estimates of the transient dynamics
 
 ## calculate elasticities for seedbank/seedling parameters by perturbing the ipm 
-### Implement the IPM 
 # original data list for the det_ipm model
 data_list <- list(
   g_int     = coef(sizeMod)[1],
@@ -319,9 +319,179 @@ disc_perturbs$elas <- (disc_perturbs$param_OGval/as.numeric(lambda(det_ipm))) * 
 mean_disc_perturbs <- disc_perturbs %>% 
   group_by(param_name) %>% 
   summarize(param_OGval = mean(param_OGval), sens_mean = mean(sens), elas_mean = mean(elas))
+mean_disc_perturbs$sens_hand <- as.numeric(NA)
+mean_disc_perturbs$elas_hand <- as.numeric(NA)
 
 ## try calculating sensitivities using eigen-things
-staySB_sens <- data_list$staySB
+# stay SB (is in position [1,1] of the matrix)
+# calculate eigen-things
+w.eigen_det.hand <- Re(eigen(mega.mat_det.di_proto$mega_matrix)$vectors[,1])
+stable.dist_det.hand <- w.eigen_det.hand/sum(w.eigen_det.hand) 
+v.eigen_det.hand <- Re(eigen(t(mega.mat_det.di_proto$mega_matrix))$vectors[,1])
+repro.val_det.hand <- v.eigen_det.hand/v.eigen_det.hand[1] 
+
+# calculate the sensitivity
+staySB_sens <- (repro.val_det.hand[1]*stable.dist_det.hand[1])/(repro.val_det.hand %*% stable.dist_det.hand)
+# calculate the elasticity
+staySB_elas <- (data_list$staySB/as.numeric(lambda(det_ipm))) * staySB_sens
+# store the values
+mean_disc_perturbs[mean_disc_perturbs$param_name == "staySB", c("sens_hand", "elas_hand")] <- list(c(staySB_sens), c(staySB_elas))
+
+# outSB (is in position [2,1] of the matrix)
+# calculate the sensitivity
+outSB_sens <- (repro.val_det.hand[2]*stable.dist_det.hand[1])/(repro.val_det.hand %*% stable.dist_det.hand)
+# calculate the elasticity
+outSB_elas <- (data_list$outSB/as.numeric(lambda(det_ipm))) * outSB_sens
+# store the values
+mean_disc_perturbs[mean_disc_perturbs$param_name == "outSB", c("sens_hand", "elas_hand")] <- list(c(outSB_sens), c(outSB_elas))
+
+# goSB (is in position [2,1] of the matrix)
+# calculate the sensitivity
+outSB_sens <- (repro.val_det.hand[2]*stable.dist_det.hand[1])/(repro.val_det.hand %*% stable.dist_det.hand)
+# calculate the elasticity
+outSB_elas <- (data_list$outSB/as.numeric(lambda(det_ipm))) * outSB_sens
+# store the values
+mean_disc_perturbs[mean_disc_perturbs$param_name == "outSB", c("sens_hand", "elas_hand")] <- list(c(outSB_sens), c(outSB_elas))
+
+## calculate the sensitivity/elasticity of the germination rate and viability rate parameters
+# original data list for the det_ipm model
+data_list <- list(
+  g_int     = coef(sizeMod)[1],
+  g_slope   = coef(sizeMod)[2],
+  g_sd      = summary(sizeMod)$sigma,
+  s_int     = coef(survMod)[1],
+  s_slope   = coef(survMod)[2],
+  p_b_int   = coef(flwrMod_t)[1], #probability of flowering
+  p_b_slope = coef(flwrMod_t)[2],
+  p_b_slope_2 = coef(flwrMod_t)[3],
+  b_int   = coef(seedMod_t)[1], #seed production
+  b_slope = coef(seedMod_t)[2],
+  c_o_mu    = coef(recMod), #recruit size distribution
+  c_o_sd    = summary(recMod)$sigma,
+  goSdlng   = goSdlng.est, # Probability that non-seedbank seeds will germinate into seedlings in year t+1
+  staySB = staySB.est, # Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
+  goSB = goSB.est, # probability that a seed produced by an adult plant in year t will enter the seedbank
+  outSB = outSB.est, # probability that a seedbank seed will germinate to a seedling in year t+1
+  p_estab = p.estab.est # probability that a seedling will establish into a rosette in t+1
+)
+viab_OG <- 0.56
+germ_OG <- 0.13
+
+## loop through w/ new parameters to update the ipm
+# get the proto_ipm from the det_ipm model object
+proto <- det_ipm$proto_ipm
+
+# make a d.f of the possible combinations of values
+possible_vals <- data.frame("viab_rt" = c(rep_len(.05, length.out = 20),
+                                          rep_len(.1, length.out = 20),
+                                          rep_len(.15, length.out = 20),
+                                          rep_len(.2, length.out = 20),
+                                          rep_len(.25, length.out = 20),
+                                          rep_len(.3, length.out = 20),
+                                          rep_len(.35, length.out = 20),
+                                          rep_len(.4, length.out = 20),
+                                          rep_len(.45, length.out = 20),
+                                          rep_len(.5, length.out = 20),
+                                          rep_len(.55, length.out = 20),
+                                          rep_len(.6, length.out = 20),
+                                          rep_len(.65, length.out = 20),
+                                          rep_len(.7, length.out = 20),
+                                          rep_len(.75, length.out = 20),
+                                          rep_len(.8, length.out = 20),
+                                          rep_len(.85, length.out = 20),
+                                          rep_len(.9, length.out = 20),
+                                          rep_len(.95, length.out = 20),
+                                          rep_len(1, length.out = 20)), 
+                            "germ_rt" = rep(
+                              seq(from = 0.05, to = 1, by = .05), 
+                              times = 20)
+                            )
+
+rm(germ_viab_perturbs)
+for (i in 1:nrow(possible_vals)) {
+  germ_now <- possible_vals$germ_rt[i]
+  viab_now <- possible_vals$viab_rt[i]
+  if (viab_now > germ_now) {
+    # calculate the parameter values using the current iteration of viab.rt and germ.rt
+    outSB_now <- germ_now
+    staySB_now <- (1 - germ_now) * .9
+    goSB_now <- viab_now - germ_now
+    goSdlng_now <- germ_now
+    
+    # get a temporary data_list
+    data_now <- data_list
+    # replace the parameter in data_now with the changed value
+    data_now[c("outSB", "staySB", "goSdlng", "goSB")] <- c(outSB_now, staySB_now, goSdlng_now, goSB_now)
+    
+    # update the parameter list of the IPM
+    parameters(proto) <- data_now
+    
+    # re-fit the ipm
+    ipm_now <- proto %>% 
+      make_ipm(iterate = TRUE, 
+               iterations = 100)
+    
+    # get the lambda of this ipm
+    lambda_now <- lambda(ipm_now)
+    
+    # save the data
+    if (exists("germ_viab_perturbs")) {
+      germ_viab_perturbs<- rbind(germ_viab_perturbs, 
+                                 data.frame(
+                                   "germ.rt" = germ_now,
+                                   "viab.rt" = viab_now,
+                                   "lambda" = as.numeric(lambda_now)
+                                 )
+      )
+    } else {
+      germ_viab_perturbs <- data.frame(
+        "germ.rt" = germ_now,
+        "viab.rt" = viab_now,
+        "lambda" = as.numeric(lambda_now)
+      )
+    }
+    }
+  }
+
+
+outSB_now <- germ_now
+staySB_now <- (1 - germ_now) * .9
+goSB_now <- viab_now - germ_now
+goSdlng_now <- germ_now
+
+germ_viab_perturbs$outSB <- germ_viab_perturbs$germ.rt
+germ_viab_perturbs$staySB <- (1 - germ_viab_perturbs$germ.rt) * 0.9
+germ_viab_perturbs$goSB <- germ_viab_perturbs$viab.rt - germ_viab_perturbs$germ.rt
+germ_viab_perturbs$goSdlng <- germ_viab_perturbs$germ.rt
+
+# view lambda values
+ggplot(data = germ_viab_perturbs) +
+  geom_contour_filled(aes(x = germ.rt, y = viab.rt, z = lambda)) + 
+  labs(title = "lambda") + 
+  theme_classic()
+
+# view seedbank parameter values
+ggplot(data = germ_viab_perturbs) +
+  geom_contour_filled(aes(x = germ.rt, y = viab.rt, z = outSB)) + 
+  labs(title = "outSB") + 
+  theme_classic()
+
+ggplot(data = germ_viab_perturbs) +
+  geom_contour_filled(aes(x = germ.rt, y = viab.rt, z = goSB)) + 
+  labs(title = "goSB") + 
+  theme_classic()
+
+ggplot(data = germ_viab_perturbs) +
+  geom_contour_filled(aes(x = germ.rt, y = viab.rt, z = staySB)) + 
+  labs(title = "staySB") + 
+  theme_classic()
+
+ggplot(data = germ_viab_perturbs) +
+  geom_contour_filled(aes(x = germ.rt, y = viab.rt, z = goSdlng)) + 
+  labs(title = "goSdlng") + 
+  theme_classic()
+
+
 ## make sure that the IPMs are not sensitive to change in size limits  
 ## 1. The size distribution and population growth rate (k) to which a population converges in the absence of perturbation (i.e. if the demographic transitions do not change), can be extracted directly from eigen analysis of the discretized kernel. The ‘stable size distribution’ is defined by the right eigenvector of the matrix, and the ‘asymptotic growth rate’ by the largest eigenvalue. The corresponding reproductive value, or contribution to long-term population size for each size, is defined by the left eigenvector. 
 ## 2. Asymptotic analyses may describe general characteristics of a population, but may poorly predict short-term dynamics. Transient dynamics are important when the population differs from the stable distribution (Williams et al. 2011). These changes can be simply quantified by projecting the population forward in time via matrix multiplication, starting from the initial size distribution and the discretized kernel (Appendix S1, A). One can determine whether transient dynamics are important using the damping ratio (q) (i.e. the ratio between the first and second eigenvalues) to describe the time-scale of transient dynamics (Caswell, 2001).

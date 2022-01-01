@@ -5,7 +5,7 @@
 #/////////////////////////
 
 #### load vital rate models from previous script ####
-source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
+#source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
 
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #### Section 1 - Define the demographic functions and parameters ####

@@ -78,15 +78,28 @@ estabs[estabs$P_estab > 1 & is.na(estabs$P_estab) == FALSE,"P_estab"] <- 1
 estabs <- as.data.frame(estabs)
 
 #### Calculate germination rate and rate of seed viability loss ####
+## data from Burgess, Hild & Shaw, 2005
+# Seeds per Capsule (no.)
+seed_per_cap <- mean(c(2.4, 1.9, 1.0))
+mean(c(1.9, 1.4, 1.0))
+# Capsule Viability(%) (percentage of capsules that are viable--contain >=1 seed)
+capsule_viab.rt <- mean(c(81, 61, 73, 54))/100
+# Seed Viability (%) (percentage of seeds in a viable capsule that are viable)
+seed_viab.rt <- mean(c(1.9/2.4, 1.4/1.9, 1/1))
+
+## calculate the number of seeds based on this seed rate 
+dat$Num_seeds <- round(dat$Num_capsules * seed_per_cap,0)
+
+## calculate the rate at which a seed produced in a capsule in year t is viable 
+total_seed_viab.rt <- capsule_viab.rt * seed_viab.rt
+
 # (data in SeedBagGreenhouseSeedlings.csv)--seeds from previous year
 germ.rt.ours <- .03
 #data from (Burgess, Hild & Shaw, 2005)--seedbank seed viability/germination rate doesn't seem to change much over time
-germ.rt.Burgess <- mean(c(16.0, 13.0, 12, 8.3, 7.0, 5.3)/45)
-germ.rt <-.05  #average together, but trending toward our estimate
-# seed viability rate (from Burgess, Hild & Shaw, 2005)
-viab.rt.Burgess <- mean(c(.79,.7,.63))
-# reduce by 20%
-viab.rt <-viab.rt.Burgess*.8
+germ.rt.Burgess <- mean(c(16.0, 13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
+germ.rt <-germ.rt.Burgess  
+
+viab.rt <- total_seed_viab.rt
 
 #### calculate the starting number of seeds in the seedbank ####
 # data from COBPGreenhouseSeedbankStudyData.csv
@@ -147,7 +160,7 @@ seedlings_site <- seedlings %>%
 seeds_est_faked <- seeds_est 
 seeds_est_faked[seeds_est_faked$seedbank_est < 0, "seedbank_est"] <- 10
 
-#### make d.f.s to illustrate the number of seeds/seedling/germs, etc. ####
+#### make d.f to illustrate the number of seeds/seedling/germs, etc. ####
 plots <- unique(dat$Plot_ID)
 years <- unique(dat$Year)
 if (exists("seeds.out")) {
@@ -158,16 +171,21 @@ for (i in 1:length(plots)) {
   for (j in 1:length(years)) {
     year_now <- years[j]
     
+    ## number of seedbank seeds in year t
     seeds_now <- data.frame("Year" = year_now, "Plot_ID" = plot_now, "NewSeeds_t" = 0, "SeedBank_t" = rep_len(1, length.out = round(seeds_est_faked[seeds_est_faked$Plot == plot_now , "seedbank_est"], 0)), "SeedBank_tplus1" = 0, "Seedling_tplus1" = 0, "Seedling_t" = 0, "Recruit_tplus1" = 0)
-    # seeds that stay in the seedbank (staySB) (prob = (1-germ.rt)*viab.rt) 
-    seeds_now[1:(round((1-germ.rt)*viab.rt * nrow(seeds_now),0)),"SeedBank_tplus1"] <- 1
+    # seeds that stay in the seedbank (staySB) (1 - germ.rt) * 0.9
+    seeds_now[1:(round((1-germ.rt)*0.9 * nrow(seeds_now),0)),"SeedBank_tplus1"] <- 1
     # seeds that leave the seedbank (outSB) (germ.rt)
     seeds_now[seeds_now$SeedBank_tplus1 == 0,][1:round(germ.rt * nrow(seeds_now),0), "Seedling_tplus1"] <- 1 
-    # seeds that enter the seedbank from the continuous stage (goSB and goSdlng)
+    
+    ## seeds that enter the seedbank from the continuous stage (goSB and goSdlng)
     n_newSeeds = sum(dat[dat$Plot_ID==plot_now & dat$Year == year_now,"Num_seeds"], 
                      na.rm = TRUE)
-    n_newGoSB = round(((1-germ.rt)*viab.rt)*n_newSeeds, 0)
+    # get the number of seeds from the reproductive plants that go into the seedbank (total_seed_viab.rt - germ.rt)
+    n_newGoSB = round((total_seed_viab.rt - germ.rt)*n_newSeeds, 0)
+    # get the number of seeds from the reproductive plants that go into the seedling stage (germ.rt)
     n_newGoSdlng = round(n_newSeeds*germ.rt,0)
+    
     if (n_newSeeds > 0) {
       seeds_now <- rbind(seeds_now, 
                          data.frame("Year" = year_now, "Plot_ID" = plot_now, 
@@ -227,8 +245,7 @@ for (i in 1:length(plots)) {
 }
 
 # put in a 'discrete' stage d.f
-discreteDat <- seeds.out
+discDat <- seeds.out
 
 # write the discreteDat d.f to file
-write.csv(x = discreteDat, 
-          file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
+# write.csv(x = discreteDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
