@@ -202,7 +202,7 @@ simple_ipm <- init_ipm(sim_gen   = "simple",
     iterations = 100
   )
 #### Deterministic, density-independent IPM for all data ####
-# vital-rate model names: survMod, sizeMod, seedMod_t, flowerMod_t, recD, p.estab.est, outSB.est, staySB.est, goSB.est, goSdlng.est 
+# vital-rate model names: survMod, sizeMod, seedMod_t, flwrMod_t, recMod, p.estab.est, outSB.est, staySB.est, goSB.est, goSdlng.est 
 
 ### Implement the IPM 
 # use ipmr to fit the IPM
@@ -351,6 +351,16 @@ lambda_ipmr <- lambda(det_ipm)
 repro_value <- left_ev(det_ipm)
 stable_dist <- right_ev(det_ipm)
 
+## check for eviction from the model
+#To check for eviction, we plot the survival model and the column sums of the survival/growth (P) matrix. Eviction occurs when the column sums are lower than the survival models suggests that they should be.
+# define the x-axis values
+meshpts <- seq(from = (min(dat$log_LL_t, na.rm = TRUE) * .8), to = (max(dat$log_LL_t, na.rm = TRUE) * 1.2) , length.out = 500)
+# plot the model-predicted survival probs.
+preds <- predict(object = survMod, newdata = data.frame("log_LL_t" = meshpts), type = 'response')
+plot(x = meshpts, y = preds, ylab = "Survival Probability", type = "l")
+# plot the survival values from the P matrix
+points(meshpts,apply(det_ipm$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
+
 ### Visualize the IPM kernel
 # first have to make a mega-kernel
 mega_mat <- make_iter_kernel(ipm = det_ipm, 
@@ -387,7 +397,7 @@ image(x = meshpts, y = meshpts, t(mega_mat$mega_matrix[3:502,3:502])^.1,
       main = "Continuous Stage (t+1)",
       col = pal[(round(min( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100): (round(max( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100)]
 ) ## get the correct values for the color ramp that correspond to the actual probabilities in the entire matrix
-text(x = 3.8, y = 2.25, c("Continuous Stage (t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
+text(x = 4.8, y = 2.25, c("Continuous Stage (t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
 abline(a = 0, b = 1, lty = 2)
 contour(x = meshpts, y = meshpts, 
         t(mega_mat$mega_matrix[3:502,3:502]), 
