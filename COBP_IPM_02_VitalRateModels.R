@@ -5,7 +5,7 @@
 # 3 December 2021
 #///////////////////////////////////////////////////////
 #### load packages ####
-library(lme4)
+library(lme4) 
 library(MASS)
 #### load data from the previous script ####
 # (COBP_IPM_01_dataPrep.R)
@@ -100,66 +100,6 @@ goSB.est <- sum(discDat[discDat$NewSeeds_t == 1, "SeedBank_tplus1"], na.rm = TRU
 # germ.rt
 goSdlng.est <-  sum(discDat[discDat$NewSeeds_t == 1, "Seedling_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
   sum(discDat[discDat$NewSeeds_t == 1, "NewSeeds_t"], na.rm = TRUE) # number of seedbank seeds in year t
-
-#### Vital Rate Models for deterministic, density-independent IPM with FIRST HALF OF DATA ####
-## subset data for years 2018-2019
-dat_first <- dat[dat$Year %in% c(2018),]
-
-# subset the data to exclude flowering individuals
-survDat_first <- dat_first[dat_first$flowering==0 | is.na(dat_first$flowering),]
-# logistic glm with log-transformed size_t
-survMod_first <- glm(survives_tplus1 ~ log_LL_t , data = survDat_first, family = binomial)
-
-## Growth ($G(z',z)$)
-# lm w/ log-transformed size_t and size_t+1
-sizeMod_first <- lm(log_LL_tplus1 ~ log_LL_t , data = dat_first)
-
-## Number of seeds produced, according to plant size ($b(z)$)
-# using size in current year (no. of seeds/plant, for those that flowered ~ size_t)
-seedDat_first <- dat_first[dat_first$flowering == 1,]
-# fit a negative binomial glm (poisson was overdispersed)
-seedMod_first <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_first)
-
-## Flowering probability ($p_b(z)$)
-# using size in current year (w/ squared term)
-# logistic glm with log-transformed size_t
-flwrMod_first <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat_first, family = binomial)))
-
-## Distribution of recruit size ($c_o(z')$)
-# subset the data
-recD_first <- dat[dat$age == 0 & is.na(dat$age) == FALSE & dat$Year == 2019,]
-# fit the model
-recMod_first <- lm(log_LL_t ~ 1, data = recD_first)
-
-#### Vital Rate Models for deterministic, density-independent IPM with SECOND HALF OF DATA ####
-## subset data for years 2018-2019
-dat_second <- dat[dat$Year %in% c(2018),]
-
-# subset the data to exclude flowering individuals
-survDat_second <- dat_second[dat_second$flowering==0 | is.na(dat_second$flowering),]
-# logistic glm with log-transformed size_t
-survMod_second <- glm(survives_tplus1 ~ log_LL_t , data = survDat_second, family = binomial)
-
-## Growth ($G(z',z)$)
-# lm w/ log-transformed size_t and size_t+1
-sizeMod_second <- lm(log_LL_tplus1 ~ log_LL_t , data = dat_second)
-
-## Number of seeds produced, according to plant size ($b(z)$)
-# using size in current year (no. of seeds/plant, for those that flowered ~ size_t)
-seedDat_second <- dat_second[dat_second$flowering == 1,]
-# fit a negative binomial glm (poisson was overdispersed)
-seedMod_second <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_second)
-
-## Flowering probability ($p_b(z)$)
-# using size in current year (w/ squared term)
-# logistic glm with log-transformed size_t
-flwrMod_second <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat_second, family = binomial)))
-
-## Distribution of recruit size ($c_o(z')$)
-# subset the data
-recD_second <- dat[dat$age == 0 & is.na(dat$age) == FALSE & dat$Year == 2020,]
-# fit the model
-recMod_second <- lm(log_LL_t ~ 1, data = recD_second)
 
 #### Vital Rate Models for Deterministic, density-dependent IPM with all data####
 ### Make vital rate models 
