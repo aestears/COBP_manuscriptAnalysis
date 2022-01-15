@@ -71,12 +71,12 @@ image(elas)
 # right eigenvector
 w.eigen_det.di <- ipmr::right_ev(ipm = det_ipm, iterations = 100)
 stable.size.dist_det.di <- w.eigen_det.di$ht_w/sum(w.eigen_det.di$ht_w) # convert to a probability density function
-plot(x = meshpts, y =  stable.size.dist_det.di, type = 'l')
+plot(x = meshpts, y =  stable.size.dist_det.di, type = 'l', xlab = "meshpts: (ln(longest leaf cm))", ylab = "probability")
 
 # left eigenvector
 v.eigen_det.di <- (ipmr::left_ev(ipm = det_ipm, iterations = 100))
 repro.val_det.di <- v.eigen_det.di$ht_v/(v.eigen_det.di$ht_v)[1]
-plot(x = meshpts, y = repro.val_det.di, type = 'l')
+plot(x = meshpts, y = repro.val_det.di, type = 'l', xlab = "meshpts: (ln(longest leaf cm))", ylab = "probability")
 
 # lambda
 lambda_det.di <- lambda(det_ipm)
@@ -88,16 +88,43 @@ mega.mat_det.di_proto <- format_mega_kernel(ipm = det_ipm,
                                       mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P))
 mega.mat_det.di <- mega.mat_det.di_proto$mega_matrix[3:502,3:502]
 # calculate the sensitivity function (whole kernel)
-sens_det.di <- outer(repro.val_det.di,stable.size.dist_det.di)/v.dot.w_det.di
+sens_det.di <- outer(repro.val_det.di,stable.size.dist_det.di, '*')/(v.dot.w_det.di)
 # calculate the elasticity function (whole kernel)
 elas_det.di <- matrix(as.vector(sens_det.di)*as.vector(mega.mat_det.di)/lambda_det.di,nrow=500)
-# plot the sensitivity function of the entire kernel
-image(sens_det.di^.1)
-# plot the elasticity function of the entire kernel
-image(elas_det.di^.1)
-# calculate the elasticity of the 'P' kernel
-P.elas_det.di <- (((det_ipm$sub_kernels$P)/h) * elas_det.di)/lambda_det.di
-## calculate elasticities of each of the vital rates
+# plot the sensitivity function of the entire continuous kernel
+image(x = meshpts, y = meshpts, t(sens_det.di)^.1, 
+      xlab = "ln(leaf) in year t", ylab = "ln(leaf) in year t+1")
+contour(x = meshpts, y = meshpts, t(sens_det.di), add = TRUE)
+# plot the elasticity function of the entire continuous kernel
+image(x = meshpts, y = meshpts, t(elas_det.di)^.1, xlab = "ln(leaf) in year t", ylab = "ln(leaf) in year t+1")
+contour(x = meshpts, y = meshpts, t(elas_det.di), add = TRUE)
+
+## calculate elasticities of each of the vital rate functions and transition kernels
+# calculate the kernel-level sensitivity function (from Ellner and Rees, pg. 96)
+# calculate the elasticity of the entire kernel
+# get the K matrix from the model
+K <- mega.mat_det.di_proto$mega_matrix
+# calculate the eigenvectors
+w.z <- Re(eigen(K)$vectors[,1])
+v.z1 <- Re(eigen(t(K))$vectors[,1])
+# calculate the sensitivity matrix
+K.sens_det.di <- outer(v.z1, w.z, "*")/sum(v.z1 * w.z * h)
+# calculate the elasticity matrix
+K.elas_det.di <- K.sens_det.di * (K / h) / (Re(eigen(K)$values[1]))
+
+# calculate the elasticity of the P matrix
+# get the K matrix from the model
+P <- det_ipm$sub_kernels$P
+# calculate the elasticity matrix
+P.elas_det.di <- P * K.sens_det.di[3:502, 3:502] / (Re(eigen(K)$values[1]))
+# get an actual number for the total elasticity of the P matrix
+
+
+# calculate the sensitivity matrix
+K.sens_det.di <- outer(v.z1, w.z, "*")/sum(v.z1 * w.z * h)
+# calculate the elasticity matrix
+K.elas_det.di <- K.sens_det.di * (K / h) / (Re(eigen(K)$values[1]))
+
 # s(z)
 dK_by_ds <- outer(meshpts, meshpts, 
                   function(z1, z) {
@@ -347,11 +374,11 @@ mean_disc_perturbs[mean_disc_perturbs$param_name == "outSB", c("sens_hand", "ela
 
 # goSB (is in position [2,1] of the matrix)
 # calculate the sensitivity
-outSB_sens <- (repro.val_det.hand[2]*stable.dist_det.hand[1])/(repro.val_det.hand %*% stable.dist_det.hand)
+goSB_sens <- (repro.val_det.hand[2]*stable.dist_det.hand[1])/(repro.val_det.hand %*% stable.dist_det.hand)
 # calculate the elasticity
-outSB_elas <- (data_list$outSB/as.numeric(lambda(det_ipm))) * outSB_sens
+goSB_elas <- (data_list$goSB/as.numeric(lambda(det_ipm))) * goSB_sens
 # store the values
-mean_disc_perturbs[mean_disc_perturbs$param_name == "outSB", c("sens_hand", "elas_hand")] <- list(c(outSB_sens), c(outSB_elas))
+mean_disc_perturbs[mean_disc_perturbs$param_name == "goSB", c("sens_hand", "elas_hand")] <- list(c(goSB_sens), c(goSB_elas))
 
 ## calculate the sensitivity/elasticity of the germination rate and viability rate parameters
 # original data list for the det_ipm model
@@ -459,11 +486,6 @@ staySB_now <- (1 - germ_now) * .9
 goSB_now <- viab_now - germ_now
 goSdlng_now <- germ_now
 
-germ_viab_perturbs$outSB <- germ_viab_perturbs$germ.rt
-germ_viab_perturbs$staySB <- (1 - germ_viab_perturbs$germ.rt) * 0.9
-germ_viab_perturbs$goSB <- germ_viab_perturbs$viab.rt - germ_viab_perturbs$germ.rt
-germ_viab_perturbs$goSdlng <- germ_viab_perturbs$germ.rt
-
 # view lambda values
 ggplot(data = germ_viab_perturbs) +
   geom_contour_filled(aes(x = germ.rt, y = viab.rt, z = lambda)) + 
@@ -496,6 +518,6 @@ ggplot(data = germ_viab_perturbs) +
 ## 1. The size distribution and population growth rate (k) to which a population converges in the absence of perturbation (i.e. if the demographic transitions do not change), can be extracted directly from eigen analysis of the discretized kernel. The ‘stable size distribution’ is defined by the right eigenvector of the matrix, and the ‘asymptotic growth rate’ by the largest eigenvalue. The corresponding reproductive value, or contribution to long-term population size for each size, is defined by the left eigenvector. 
 ## 2. Asymptotic analyses may describe general characteristics of a population, but may poorly predict short-term dynamics. Transient dynamics are important when the population differs from the stable distribution (Williams et al. 2011). These changes can be simply quantified by projecting the population forward in time via matrix multiplication, starting from the initial size distribution and the discretized kernel (Appendix S1, A). One can determine whether transient dynamics are important using the damping ratio (q) (i.e. the ratio between the first and second eigenvalues) to describe the time-scale of transient dynamics (Caswell, 2001).
 ## 3. Using Markov chain theory,models of structured populations can be extended to incorporate stochastic changes in vital rates over time (Tuljapurkar 1990). These have proven powerful for exploring evolutionary dynamics (evolutionarily stable strategies; Appendix S1,G; Childs et al. 2004; Rees et al. 2006; Ellner &Rees 2007),management questions (risk of extinction; Fieberg & Ellner 2001; Morris & Doak 2002) and predicting environmental responses (Fieberg & Ellner 2001; Morris & Doak 2002). 
-## 4. Sensitivity and elasticity (proportional sensitivity) analyses can determine how different parts ofthe kernel influence popu- lation statistics (de Kroon, van Groenendael & Ehrl?en 2000; Caswell 2001). These analyses can illustrate the relative importance of different transitions, showing in a continuous ‘landscape’ which vital rates and which size ranges contribute most to k or other population statistics (Appendix S1,A,B). Sensitivity and elasticity values can be used to estimate selection gradients in evolutionary studies (Caswell 2001) or to compare effects of different management options in conservation planning (Morris&Doak 2002). Methods exist to estimate sensitivity of an array of population characteristics in the context of transient dynamics (Caswell 2007; Haridas & Tuljapurkar 2007) and stochastic dynamics. 
+## 4. Sensitivity and elasticity (proportional sensitivity) analyses can determine how different parts of the kernel influence population statistics (de Kroon, van Groenendael & Ehrl?en 2000; Caswell 2001). These analyses can illustrate the relative importance of different transitions, showing in a continuous ‘landscape’ which vital rates and which size ranges contribute most to k or other population statistics (Appendix S1,A,B). Sensitivity and elasticity values can be used to estimate selection gradients in evolutionary studies (Caswell 2001) or to compare effects of different management options in conservation planning (Morris&Doak 2002). Methods exist to estimate sensitivity of an array of population characteristics in the context of transient dynamics (Caswell 2007; Haridas & Tuljapurkar 2007) and stochastic dynamics. 
 ## 5. Another strength of IPMs is the ability to explore vital rate parameter sensitivity (Appendix S1,B). Distinct from transition sensitivities (as above), for example, the sensitivity of k to growth regression parameters can be used to investigate the effects of changes in individual growth rate across all stages simultaneously (intercept), or in a manner that favours larger individuals over smaller individuals (slope). 
 ## 6. Many other population statistics are readily calculated from IPM matrices, such as passage times to life-history events (e.g. maturation; Fig. 3c), life expectancy (Fig. 3d), net reproductive rate (R0) or generation length (Appendix S1,A; Caswell 2001; Smallegange&Coulson 2013).
