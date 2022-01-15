@@ -118,13 +118,9 @@ P <- det_ipm$sub_kernels$P
 # calculate the elasticity matrix
 P.elas_det.di <- P * K.sens_det.di[3:502, 3:502] / (Re(eigen(K)$values[1]))
 # get an actual number for the total elasticity of the P matrix
+sum(P.elas_det.di) * h^2
 
-
-# calculate the sensitivity matrix
-K.sens_det.di <- outer(v.z1, w.z, "*")/sum(v.z1 * w.z * h)
-# calculate the elasticity matrix
-K.elas_det.di <- K.sens_det.di * (K / h) / (Re(eigen(K)$values[1]))
-
+#???? don't think the below stuff is correct
 # s(z)
 dK_by_ds <- outer(meshpts, meshpts, 
                   function(z1, z) {
@@ -349,6 +345,7 @@ mean_disc_perturbs <- disc_perturbs %>%
 mean_disc_perturbs$sens_hand <- as.numeric(NA)
 mean_disc_perturbs$elas_hand <- as.numeric(NA)
 
+
 ## try calculating sensitivities using eigen-things
 # stay SB (is in position [1,1] of the matrix)
 # calculate eigen-things
@@ -380,6 +377,10 @@ goSB_elas <- (data_list$goSB/as.numeric(lambda(det_ipm))) * goSB_sens
 # store the values
 mean_disc_perturbs[mean_disc_perturbs$param_name == "goSB", c("sens_hand", "elas_hand")] <- list(c(goSB_sens), c(goSB_elas))
 
+
+
+
+#%%%AES%%% need to fix/work on this stuff below
 ## calculate the sensitivity/elasticity of the germination rate and viability rate parameters
 # original data list for the det_ipm model
 data_list <- list(
@@ -512,6 +513,11 @@ ggplot(data = germ_viab_perturbs) +
   geom_contour_filled(aes(x = germ.rt, y = viab.rt, z = goSdlng)) + 
   labs(title = "goSdlng") + 
   theme_classic()
+
+## LTRE analysis from Merow 2014 Appendix, pgs. 97-100
+# compare IPM using the first transition to an IPM using the second transition
+
+
 
 
 ## make sure that the IPMs are not sensitive to change in size limits  
