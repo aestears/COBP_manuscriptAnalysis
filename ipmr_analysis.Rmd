@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #load packages
 library(tidyverse)
 library(ipmr)
+library(MASS)
 ```
 ## Background
 *Oenothera coloradensis* is a monocarpic perennial herb that occurs in riparian and wetland habitats in southeast Wyoming, southwest Nebraska, and northern Colorado. It was listed as "threatened" under the Endangered Species Act until December, 2019. It was originally listed because it is naturally rare, and even though it's ESA designation has since been removed, this species is still very uncommon. One chapter of my dissertation is using demographic methods to investigate the mechanisms that allow populations of this rare species to persist. I am building an integral projection model (IPM) for this species, and can use results from this model to test for the existence of several different persistence mechanisms. 
@@ -39,7 +40,10 @@ These are simple models that do not include density dependence or environmental 
 **Load census data**
 ```{r}
 # load continuous stage data
-dat <- read.csv("../../Processed_Data/COBP_long_CURRENT.csv")
+# replace this with the location of 'COBP_long_CURRENT' on your machine
+fileName_1 <- "../../Processed_Data/COBP_long_CURRENT.csv"
+
+dat <- read.csv(fileName_1)
 ```
 
 **Survival ($s(z)$)**
@@ -77,9 +81,9 @@ lines(x = newdata$log_LL_t, y = predict(object = sizeMod, newdata =  newdata), c
  ## use only plants that flowered 
  seedDat <- dat[dat$flowering==1,]
 ## fit poisson glm (for count data)
-seedMod_t <- glm(Num_seeds ~ log_LL_t , data = seedDat, family = poisson)
+seedMod_t <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat)
 summary(seedMod_t)
-## plot model results
+# plot model results
 plot(Num_seeds ~ log_LL_t, data = seedDat)
 newdata <- data.frame("log_LL_t" = seq(from = min(seedDat$log_LL_t, na.rm = TRUE), 
                                        to = max(seedDat$log_LL_t, na.rm = TRUE),
@@ -114,38 +118,35 @@ abline(v = recMod$coefficients, col = "blue", lwd = 2)
 
 **Probability of a seedling in year *t* establishing to a rosette in year *t+1* ($p_{estab}$)**
 ```{r message=FALSE}
-p.estab.est <- 0.5197184
+p.estab.est <- 0.3313
 ```
 
 **Get germination rate and rate of seed viability maintenance**
 ```{r}
 ## germination rate
-germ.rt <- 0.08 
+germ.rt <- 0.12
 
 ## seed viability rate 
-viab.rt <- 0.71
+viab.rt <- 0.57
 ```
 
 **Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1 ($outSB$)**
 ```{r}
-outSB.est <-   germ.rt
+outSB.est <-  germ.rt
 ```
 
 **Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1 ($staySB$)**
 ```{r}
-## seed viability rate  
-staySB.est <- (1-germ.rt)*viab.rt
+staySB.est <- (1-germ.rt)*.9 #estimate that 10% seeds in the SB die from year t to year t+1
 ```
 
 **Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1 ($goSB$)**
 ```{r}
-## 
-goSB.est <- (1 - germ.rt)*viab.rt
+goSB.est <- viab.rt - germ.rt
 ```
 
 **Probability that a seed from a plant in year t will go directly to the seedling stage ($goSdlng$)**
 ```{r}
-## use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
 goSdlng.est <- germ.rt
 ```
 
@@ -298,9 +299,9 @@ general_ipm <- general_ipm %>%
 **Define the limits of size and starting population states**
 ```{r}
 # lower limit of size
-L <- 1.09
+L <- -0.9
 # upper limit of size
-U <- 3.66
+U <- 4.4
 # number of break-points
 n <- 500
 
