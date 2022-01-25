@@ -97,8 +97,11 @@ total_seed_viab.rt <- capsule_viab.rt * seed_viab.rt
 germ.rt.ours <- .03
 #data from (Burgess, Hild & Shaw, 2005)--seedbank seed viability/germination rate doesn't seem to change much over time
 germ.rt.Burgess <- mean(c(16.0, 13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
-germ.rt <-germ.rt.Burgess  
 
+# germination rate from the Burgess paper incorporates both viability and germination. To isoloate just the germination rate, divide the Burgess germination rate by the viability rate
+germ.rt <-germ.rt.Burgess/total_seed_viab.rt  
+
+# the viability rate (proportion of seeds produced by an adult plant that are viable) is the 'total_seed_viab.rt' derived from the Burgess paper results
 viab.rt <- total_seed_viab.rt
 
 #### calculate the starting number of seeds in the seedbank ####
@@ -248,4 +251,4 @@ for (i in 1:length(plots)) {
 discDat <- seeds.out
 
 # write the discreteDat d.f to file
-# write.csv(x = discreteDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
+#write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
