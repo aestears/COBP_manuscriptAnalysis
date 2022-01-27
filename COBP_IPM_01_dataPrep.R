@@ -28,12 +28,107 @@ seedlings[seedlings$Plot_ID %in% c("S1", "S2", "S3"), "Site"] <- "HQ5"
 seedlings[seedlings$Plot_ID %in% c("S4", "S5", "S6"), "Site"] <- "HQ3"
 seedlings[seedlings$Plot_ID %in% c("S7", "S8", "S9"), "Site"] <- "Meadow"
 
+## make seedling data into 'continuous' data
+# add the seedling data with each row representing a seedling
+for (i in 1:nrow(seedlings)) {
+  seedlingNow <- seedlings[i,]
+  # make a d.f to rbind to the seedlings_long d.f. that contains the appropriate data and # of rows for the number of seedlings in the data
+  if (seedlingNow$Seedlings_t > 0) {
+    temp <- data.frame("Location" = NA, "Site" = rep(seedlingNow$Site, length.out = seedlingNow$Seedlings_t),
+                       "Plot_ID" = seedlingNow$Plot_ID,
+                       "Quadrant" = NA, "ID" = NA, "X_cm" = NA, "Y_cm" = NA, "Year" = seedlingNow$Year, "LongestLeaf_cm" = NA, "survives_t" = 1, "flowering" = 0, "Num_capsules" = NA, "Stem_Herb" = NA, "Invert_Herb" = NA, "LeafSpots" = NA, "survives_tplus1" = NA, "longestLeaf_tminus1" = NA, "longestLeaf_tplus1" = NA,  "age" = 0,  "seedling" = 1, "index" = NA, "Num_seeds" = NA, "log_LL_t" = NA, "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, "N_seedlings_t" = seedlingNow$Seedlings_t, "N_adults_t" = NA, "N_all_t" = NA, "recruit" = NA)
+    if (i == 1) {
+      # add this data into the seedlings_long d.f
+      seedlings_long <- temp
+    } else {
+      seedlings_long <- rbind(seedlings_long, temp)
+    }
+  }
+}
+
+# assign the seedlings a 'random' size from a uniform distribution (between .1 and 3 cm longest leaf size)
+set.seed(12011993)
+sizes <- runif(n = 4425, min = 0.1, max = 3)
+seedlings_long$LongestLeaf_cm = sizes
+
+# because we know the number of indivdiuals that were 'recruited' into the adult plant stage, we can estimate the number of seedlings that survive in each quadrat. We will randomly assign the these 'new recruits' to a seedling 
+# get the data for 'recruits' to the adult stage
+recruitsTemp <- dat[dat$recruit == 1,]
+# loop through by quadrat/year
+quads <- unique(dat$Plot_ID)
+years <- unique(dat$Year)
+for (i in 1:length(quads)) {
+  # can't get recruit data for 2018,b/c we can't know how old the plants were in the first year of sampling
+  for (j in 1:(length(years)-1)) {
+    # get recruit data for this quad and the NEXT year
+    recsNow <- recruitsTemp[recruitsTemp$Plot_ID == quads[i] & 
+                              recruitsTemp$Year == years[j+1],]
+    # get seedling data for this quad and the CURRENT year
+    seedsNow <- seedlings_long[seedlings_long$Plot_ID == quads[i] & 
+                                 seedlings_long$Year == years[j],]
+    # if # of seedlings is GREATER than # of recruits...
+    if (nrow(seedsNow) >= nrow(recsNow)) {
+      numSdlngsDead <- nrow(seedsNow) - nrow(recsNow)
+      # add plant "ID" to seedlings that survived
+      seedsNow$ID <- c(recsNow$ID,
+                       rep(NA, length.out = numSdlngsDead))
+      # add a '1' to "survives_tplus1" column for seedlings that survived
+      seedsNow$survives_tplus1 <- c(rep(1, length.out = nrow(recsNow)),
+                                    rep(0, length.out = numSdlngsDead))
+      # add plant size in "longestLeaf_tplus1" to seedlings that survived
+      seedsNow$longestLeaf_tplus1 <- c(recsNow$LongestLeaf_cm,
+                                       rep(NA, length.out = numSdlngsDead))
+      
+    } else if (nrow(seedsNow) < nrow(recsNow)) { # if # of seedlings is LESS than # of recruits...
+      # add a necessary number of rows to the seedling d.f to make it the same length as the recruit d.f
+      numNewSdlngs <- nrow(recsNow) - nrow(seedsNow)
+    
+      # make a d.f of the new seedlings
+      temp <- data.frame("Location" = NA, "Site" = rep(recsNow$Site, length.out = numNewSdlngs),
+                         "Plot_ID" = quads[i],"Quadrant" = NA, "ID" = NA, "X_cm" = NA, 
+                         "Y_cm" = NA, "Year" = years[j], 
+                         "LongestLeaf_cm" = runif(n = numNewSdlngs, min = 0.1, max = 3), 
+                         "survives_t" = 1, "flowering" = 0, "Num_capsules" = NA, "Stem_Herb" = NA,
+                         "Invert_Herb" = NA, "LeafSpots" = NA, "survives_tplus1" = NA,
+                         "longestLeaf_tminus1" = NA, "longestLeaf_tplus1" = NA,  "age" = 0,  
+                         "seedling" = 1, "index" = NA, "Num_seeds" = NA, "log_LL_t" = NA, 
+                         "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, 
+                         "N_seedlings_t" = NA, "N_adults_t" = NA, 
+                         "N_all_t" = NA, "recruit" = NA)
+      
+      # then add this to the seedsNow d.f
+      if (nrow(seedsNow) == 0) {
+        seedsNow <- temp
+      } else {
+        seedsNow <- rbind(seedsNow, temp)
+      }
+      # add plant "ID" to seedlings that survived
+      seedsNow$ID <- recsNow$ID
+      # add a '1' to "survives_tplus1" column for seedlings that survived
+      seedsNow$survives_tplus1 <- 1
+      # add plant size in "longestLeaf_tplus1" to seedlings that survived
+      seedsNow$longestLeaf_tplus1 <- recsNow$LongestLeaf_cm
+    }
+    # save the results
+    if (i == 1 & j ==1) {
+      seedlings_cont <- seedsNow
+    } else {
+      seedlings_cont <- rbind(seedlings_cont, seedsNow)
+    }
+  }
+}
+
+## "seedlings_cont" contains the continuous seedling data
+# there are only values for 2018 and 2019, since we can't know whether seedlings from 2020 survived or not
+# add seedlings_cont to the dat dataframe
+dat_all <- rbind(dat, seedlings_cont)
+
 ## get the environmental data
 source("./data_prep_scripts/prepping_Envi_Data.R")
 # called "Climate", "soilTemp_plot", and "soilMoist"
 ## add the envi data to the 'dat' data.frame
 # add soil moisture data (have that for every plot, from one time point)
-dat <- left_join(dat, soilMoist[,c("Site", "SoilMoisture_m3m3")], by = c("Plot_ID" = "Site"))
+dat_all <- left_join(dat_all, soilMoist[,c("Site", "SoilMoisture_m3m3")], by = c("Plot_ID" = "Site"))
 # add soil temperature data (have mean values for every site, from one time point)
 # reformat the data to have means for each site 
 soilTemp <- soilTemp_plot %>% 
@@ -42,17 +137,17 @@ soilTemp <- soilTemp_plot %>%
             sd_soilTemp_winter = mean(sd_soilTemp_winter, na.rm = TRUE),
             SoilTemp_grow_C = mean(SoilTemp_grow_C, na.rm = TRUE), 
             sd_soilTemp_grow = mean(sd_soilTemp_grow, na.rm = TRUE))
-dat <- left_join(dat, soilTemp)
+dat_all <- left_join(dat_all, soilTemp)
 # add the climate data (have mean values for each location)
-dat <- left_join(dat, Climate)
+dat_all <- left_join(dat_all, Climate)
 
 # scale environmental variables
-dat$Year <- as.factor(dat$Year)
-dat$SoilMoisture_m3m3_s <- scale(dat$SoilMoisture_m3m3)
-dat$SoilTemp_winter_C_s <- scale(dat$SoilTemp_winter_C)
-dat$SoilTemp_grow_C_s <- scale(dat$SoilTemp_grow_C)
-dat$tMean_grow_C_s <- scale(dat$tMean_grow_C)
-dat$precipWaterYr_cm_s <- scale(dat$precipWaterYr_cm)
+dat_all$Year <- as.factor(dat_all$Year)
+dat_all$SoilMoisture_m3m3_s <- scale(dat_all$SoilMoisture_m3m3)
+dat_all$SoilTemp_winter_C_s <- scale(dat_all$SoilTemp_winter_C)
+dat_all$SoilTemp_grow_C_s <- scale(dat_all$SoilTemp_grow_C)
+dat_all$tMean_grow_C_s <- scale(dat_all$tMean_grow_C)
+dat_all$precipWaterYr_cm_s <- scale(dat_all$precipWaterYr_cm)
 
 # get the number of recruits/year 
 estabTemp <- dat %>% 
