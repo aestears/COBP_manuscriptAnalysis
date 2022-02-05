@@ -159,15 +159,15 @@ dat_all$precipWaterYr_cm_s <- scale(dat_all$precipWaterYr_cm)
 
 # get the number of recruits/year 
 estabTemp <- dat %>% 
-  dplyr::select(Plot_ID, Year, recruit) %>% 
-  group_by(Plot_ID, Year) %>% 
+  dplyr::select(Plot_ID, Year, Quadrant, recruit) %>% 
+  group_by(Plot_ID, Quadrant, Year) %>% 
   summarize( recruits = sum(recruit)) %>% 
   rename( recruits_t = recruits)
 # change the 2018 recruit values to NA, since we don't have a count of recruits to the rosette stage for that year
 estabTemp[estabTemp$Year==2018, "recruits_t"] <- NA
 # get the number of recruits in year t+1
 estabTemp$Year <- as.numeric(as.character(estabTemp$Year)) - 1
-names(estabTemp)[3] <- "recruits_tplus1"
+names(estabTemp)[4] <- "recruits_tplus1"
 # get the no.of seedlings/year
 # load the seedling data ('seedlings' df)
 # combine seedling and rosette recruit data
