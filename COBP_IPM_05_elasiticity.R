@@ -378,8 +378,6 @@ goSB_elas <- (data_list$goSB/as.numeric(lambda(det_ipm))) * goSB_sens
 mean_disc_perturbs[mean_disc_perturbs$param_name == "goSB", c("sens_hand", "elas_hand")] <- list(c(goSB_sens), c(goSB_elas))
 
 
-
-
 #%%%AES%%% need to fix/work on this stuff below
 ## calculate the sensitivity/elasticity of the germination rate and viability rate parameters
 # original data list for the det_ipm model
@@ -516,9 +514,29 @@ ggplot(data = germ_viab_perturbs) +
 
 ## LTRE analysis from Merow 2014 Appendix, pgs. 97-100
 # compare IPM using the first transition to an IPM using the second transition
+# get the K matrices for the IPMS
+K_first <- format_mega_kernel(ipm = det_ipm_first, 
+                                            mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P))$mega_matrix
 
-
-
+K_second <- format_mega_kernel(ipm = det_ipm_second, 
+                                     mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P))$mega_matrix
+# calculate the arithmetic mean of the two IPMs
+IPM_mid <- (K_first + K_second)/2
+# calculate the difference between the two IPMs
+IPM_diff <- (K_second - K_first)
+# calculate the sensitivity of the mean IPM
+# calculate the eigenvectors
+w.z_mid <- Re(eigen(IPM_mid)$vectors[,1])
+v.z1_mid <- Re(eigen(t(IPM_mid))$vectors[,1])
+# calculate the sensitivity matrix
+sens_IPM_mid <- IPMpack::sens(IPM_mid)
+# get a matrix giving the contribution of each element of the kernel to changes between years (differences between years weighted by sensitivity)
+IPM_contrib <- IPM_diff * sens_IPM_mid
+# check this worked
+lambda(det_ipm_second) - lambda(det_ipm_first) 
+sum(IPM_contrib)
+## visualize the relative contribution matrix
+image(t(IPM_contrib^.1))
 
 ## make sure that the IPMs are not sensitive to change in size limits  
 ## 1. The size distribution and population growth rate (k) to which a population converges in the absence of perturbation (i.e. if the demographic transitions do not change), can be extracted directly from eigen analysis of the discretized kernel. The ‘stable size distribution’ is defined by the right eigenvector of the matrix, and the ‘asymptotic growth rate’ by the largest eigenvalue. The corresponding reproductive value, or contribution to long-term population size for each size, is defined by the left eigenvector. 

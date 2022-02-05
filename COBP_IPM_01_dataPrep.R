@@ -14,8 +14,8 @@ dat <- read.csv("../Processed_Data/COBP_long_CURRENT.csv")
 
 ## get seedling data
 seedlings <- read.csv("../Raw Data/COBP_seedlings_8_23_21.csv") %>% 
-  dplyr::select(Plot_ID, Seedlings_18, Seedlings_19, Seedlings_20) %>% 
-  group_by(Plot_ID) %>% 
+  dplyr::select(Plot_ID, Quadrant, Seedlings_18, Seedlings_19, Seedlings_20) %>% 
+  group_by(Plot_ID, Quadrant) %>% 
   summarize(Seedlings_18 = sum(Seedlings_18), Seedlings_19 = sum(Seedlings_19), Seedlings_20 = sum(Seedlings_20)) %>% 
   pivot_longer(cols = c(Seedlings_18, Seedlings_19, Seedlings_20), names_to = "Year", values_to = "Seedlings_t", names_pattern = "([[:digit:]]+)") %>% 
   mutate(Year = (as.numeric(Year) + 2000))
@@ -36,7 +36,7 @@ for (i in 1:nrow(seedlings)) {
   if (seedlingNow$Seedlings_t > 0) {
     temp <- data.frame("Location" = NA, "Site" = rep(seedlingNow$Site, length.out = seedlingNow$Seedlings_t),
                        "Plot_ID" = seedlingNow$Plot_ID,
-                       "Quadrant" = NA, "ID" = NA, "X_cm" = NA, "Y_cm" = NA, "Year" = seedlingNow$Year, "LongestLeaf_cm" = NA, "survives_t" = 1, "flowering" = 0, "Num_capsules" = NA, "Stem_Herb" = NA, "Invert_Herb" = NA, "LeafSpots" = NA, "survives_tplus1" = NA, "longestLeaf_tminus1" = NA, "longestLeaf_tplus1" = NA,  "age" = 0,  "seedling" = 1, "index" = NA, "Num_seeds" = NA, "log_LL_t" = NA, "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, "N_seedlings_t" = seedlingNow$Seedlings_t, "N_adults_t" = NA, "N_all_t" = NA, "recruit" = NA)
+                       "Quadrant" = seedlingNow$Quadrant, "ID" = NA, "X_cm" = NA, "Y_cm" = NA, "Year" = seedlingNow$Year, "LongestLeaf_cm" = NA, "survives_t" = 1, "flowering" = 0, "Num_capsules" = NA, "Stem_Herb" = NA, "Invert_Herb" = NA, "LeafSpots" = NA, "survives_tplus1" = NA, "longestLeaf_tminus1" = NA, "longestLeaf_tplus1" = NA,  "age" = 0,  "seedling" = 1, "index" = NA, "Num_seeds" = NA, "log_LL_t" = NA, "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, "N_seedlings_t" = seedlingNow$Seedlings_t, "N_adults_t" = NA, "N_all_t" = NA, "recruit" = NA)
     if (i == 1) {
       # add this data into the seedlings_long d.f
       seedlings_long <- temp
@@ -48,7 +48,7 @@ for (i in 1:nrow(seedlings)) {
 
 # assign the seedlings a 'random' size from a uniform distribution (between .1 and 3 cm longest leaf size)
 set.seed(12011993)
-sizes <- runif(n = 4425, min = 0.1, max = 3)
+sizes <- runif(4425, min = 0.1, max = 3) # sample from a dist. skewed to the right, partially b/c I can't get the model to run without it, and partially b/c the seedlings actually were more likely to be larger (is multiplied by 3, since we want size to range from 0 to 3)
 seedlings_long$LongestLeaf_cm = sizes
 
 # because we know the number of indivdiuals that were 'recruited' into the adult plant stage, we can estimate the number of seedlings that survive in each quadrat. We will randomly assign the these 'new recruits' to a seedling 
@@ -56,67 +56,71 @@ seedlings_long$LongestLeaf_cm = sizes
 recruitsTemp <- dat[dat$recruit == 1,]
 # loop through by quadrat/year
 quads <- unique(dat$Plot_ID)
+quadrants <- unique(dat$Quadrant)
 years <- unique(dat$Year)
 for (i in 1:length(quads)) {
   # can't get recruit data for 2018,b/c we can't know how old the plants were in the first year of sampling
-  for (j in 1:(length(years)-1)) {
-    # get recruit data for this quad and the NEXT year
-    recsNow <- recruitsTemp[recruitsTemp$Plot_ID == quads[i] & 
-                              recruitsTemp$Year == years[j+1],]
-    # get seedling data for this quad and the CURRENT year
-    seedsNow <- seedlings_long[seedlings_long$Plot_ID == quads[i] & 
-                                 seedlings_long$Year == years[j],]
-    # if # of seedlings is GREATER than # of recruits...
-    if (nrow(seedsNow) >= nrow(recsNow)) {
-      numSdlngsDead <- nrow(seedsNow) - nrow(recsNow)
-      # add plant "ID" to seedlings that survived
-      seedsNow$ID <- c(recsNow$ID,
-                       rep(NA, length.out = numSdlngsDead))
-      # add a '1' to "survives_tplus1" column for seedlings that survived
-      seedsNow$survives_tplus1 <- c(rep(1, length.out = nrow(recsNow)),
-                                    rep(0, length.out = numSdlngsDead))
-      # add plant size in "longestLeaf_tplus1" to seedlings that survived
-      seedsNow$longestLeaf_tplus1 <- c(recsNow$LongestLeaf_cm,
-                                       rep(NA, length.out = numSdlngsDead))
-      
-    } else if (nrow(seedsNow) < nrow(recsNow)) { # if # of seedlings is LESS than # of recruits...
-      # add a necessary number of rows to the seedling d.f to make it the same length as the recruit d.f
-      numNewSdlngs <- nrow(recsNow) - nrow(seedsNow)
-    
-      # make a d.f of the new seedlings
-      temp <- data.frame("Location" = NA, "Site" = rep(recsNow$Site, length.out = numNewSdlngs),
-                         "Plot_ID" = quads[i],"Quadrant" = NA, "ID" = NA, "X_cm" = NA, 
-                         "Y_cm" = NA, "Year" = years[j], 
-                         "LongestLeaf_cm" = runif(n = numNewSdlngs, min = 0.1, max = 3), 
-                         "survives_t" = 1, "flowering" = 0, "Num_capsules" = NA, "Stem_Herb" = NA,
-                         "Invert_Herb" = NA, "LeafSpots" = NA, "survives_tplus1" = NA,
-                         "longestLeaf_tminus1" = NA, "longestLeaf_tplus1" = NA,  "age" = 0,  
-                         "seedling" = 1, "index" = NA, "Num_seeds" = NA, "log_LL_t" = NA, 
-                         "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, 
-                         "N_seedlings_t" = NA, "N_adults_t" = NA, 
-                         "N_all_t" = NA, "recruit" = NA)
-      
-      # then add this to the seedsNow d.f
-      if (nrow(seedsNow) == 0) {
-        seedsNow <- temp
-      } else {
-        seedsNow <- rbind(seedsNow, temp)
+  for (k in 1:length(quadrants)) {
+    for (j in 1:(length(years)-1)) {
+      # get recruit data for this quad and the NEXT year
+      recsNow <- recruitsTemp %>% 
+        filter(Plot_ID == quads[i] & Quadrant == quadrants[k] & Year == years[j+1])
+      # get seedling data for this quad and the CURRENT year
+      seedsNow <- seedlings_long %>% 
+        filter(Plot_ID == quads[i] & Quadrant == quadrants[k] & Year == years[j])
+      # if # of seedlings is GREATER than # of recruits...
+      if (nrow(seedsNow) >= nrow(recsNow)) {
+        numSdlngsDead <- nrow(seedsNow) - nrow(recsNow)
+        # add plant "ID" to seedlings that survived
+        seedsNow$ID <- c(recsNow$ID,
+                         rep(NA, length.out = numSdlngsDead))
+        # add a '1' to "survives_tplus1" column for seedlings that survived
+        seedsNow$survives_tplus1 <- c(rep(1, length.out = nrow(recsNow)),
+                                      rep(0, length.out = numSdlngsDead))
+        # add plant size in "longestLeaf_tplus1" to seedlings that survived
+        seedsNow$longestLeaf_tplus1 <- c(recsNow$LongestLeaf_cm,
+                                         rep(NA, length.out = numSdlngsDead))
+        
+      } else if (nrow(seedsNow) < nrow(recsNow)) { # if # of seedlings is LESS than # of recruits...
+        # add a necessary number of rows to the seedling d.f to make it the same length as the recruit d.f
+        numNewSdlngs <- nrow(recsNow) - nrow(seedsNow)
+        
+        # make a d.f of the new seedlings
+        temp <- data.frame("Location" = NA, "Site" = rep(recsNow$Site, length.out = numNewSdlngs),
+                           "Plot_ID" = quads[i],"Quadrant" = rep(recsNow$Quadrant, length.out = numNewSdlngs), "ID" = NA, "X_cm" = NA, 
+                           "Y_cm" = NA, "Year" = years[j], 
+                           "LongestLeaf_cm" = runif(numNewSdlngs, min = 0.1, max = 3),
+                           "survives_t" = 1, "flowering" = 0, "Num_capsules" = NA, "Stem_Herb" = NA,
+                           "Invert_Herb" = NA, "LeafSpots" = NA, "survives_tplus1" = NA,
+                           "longestLeaf_tminus1" = NA, "longestLeaf_tplus1" = NA,  "age" = 0,  
+                           "seedling" = 1, "index" = NA, "Num_seeds" = NA, "log_LL_t" = NA, 
+                           "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, 
+                           "N_seedlings_t" = NA, "N_adults_t" = NA, 
+                           "N_all_t" = NA, "recruit" = NA)
+        
+        # then add this to the seedsNow d.f
+        if (nrow(seedsNow) == 0) {
+          seedsNow <- temp
+        } else {
+          seedsNow <- rbind(seedsNow, temp)
+        }
+        # add plant "ID" to seedlings that survived
+        seedsNow$ID <- recsNow$ID
+        # add a '1' to "survives_tplus1" column for seedlings that survived
+        seedsNow$survives_tplus1 <- 1
+        # add plant size in "longestLeaf_tplus1" to seedlings that survived
+        seedsNow$longestLeaf_tplus1 <- recsNow$LongestLeaf_cm
       }
-      # add plant "ID" to seedlings that survived
-      seedsNow$ID <- recsNow$ID
-      # add a '1' to "survives_tplus1" column for seedlings that survived
-      seedsNow$survives_tplus1 <- 1
-      # add plant size in "longestLeaf_tplus1" to seedlings that survived
-      seedsNow$longestLeaf_tplus1 <- recsNow$LongestLeaf_cm
-    }
-    # save the results
-    if (i == 1 & j ==1) {
-      seedlings_cont <- seedsNow
-    } else {
-      seedlings_cont <- rbind(seedlings_cont, seedsNow)
+      # save the results
+      if (i == 1 & j == 1 & k == 1) {
+        seedlings_cont <- seedsNow
+      } else {
+        seedlings_cont <- rbind(seedlings_cont, seedsNow)
+      }
     }
   }
-}
+  }
+  
 
 ## "seedlings_cont" contains the continuous seedling data
 # there are only values for 2018 and 2019, since we can't know whether seedlings from 2020 survived or not
@@ -139,7 +143,11 @@ soilTemp <- soilTemp_plot %>%
             sd_soilTemp_grow = mean(sd_soilTemp_grow, na.rm = TRUE))
 dat_all <- left_join(dat_all, soilTemp)
 # add the climate data (have mean values for each location)
+dat_all$Year <- as.double(as.character(dat_all$Year))
 dat_all <- left_join(dat_all, Climate)
+# log-transform size variables
+dat_all$log_LL_t <- log(dat_all$LongestLeaf_cm)
+dat_all$log_LL_tplus1 <- log(dat_all$longestLeaf_tplus1)
 
 # scale environmental variables
 dat_all$Year <- as.factor(dat_all$Year)
@@ -173,27 +181,26 @@ estabs[estabs$P_estab > 1 & is.na(estabs$P_estab) == FALSE,"P_estab"] <- 1
 estabs <- as.data.frame(estabs)
 
 #### Calculate germination rate and rate of seed viability loss ####
-## data from Burgess, Hild & Shaw, 2005
-# Seeds per Capsule (no.)
-seed_per_cap <- mean(c(2.4, 1.9, 1.0))
-mean(c(1.9, 1.4, 1.0))
+## data from Burgess, Hild & Shaw, 2005--NOT using data from MT place, only from FEWAFB
+# Seeds per Capsule (total no., viable and inviable)
+seed_per_cap <- mean(c(2.4, 1.0))
 # Capsule Viability(%) (percentage of capsules that are viable--contain >=1 seed)
-capsule_viab.rt <- mean(c(81, 61, 73, 54))/100
+capsule_viab.rt <- mean(c(81, 61, 54))/100
 # Seed Viability (%) (percentage of seeds in a viable capsule that are viable)
-seed_viab.rt <- mean(c(1.9/2.4, 1.4/1.9, 1/1))
+seed_viab.rt <- mean(c(1.9/2.4,  1/1))
 
 ## calculate the number of seeds based on this seed rate 
 dat$Num_seeds <- round(dat$Num_capsules * seed_per_cap,0)
 
-## calculate the rate at which a seed produced in a capsule in year t is viable 
+## calculate the rate at which a seed produced in a capsule in year t is viable (probability of a viable capsule * probability that a seed inside a viable capsule is viable) 
 total_seed_viab.rt <- capsule_viab.rt * seed_viab.rt
 
 # (data in SeedBagGreenhouseSeedlings.csv)--seeds from previous year
 germ.rt.ours <- .03
-#data from (Burgess, Hild & Shaw, 2005)--seedbank seed viability/germination rate doesn't seem to change much over time
-germ.rt.Burgess <- mean(c(16.0, 13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
+#data from (Burgess, Hild & Shaw, 2005)--seedbank seed viability/germination rate doesn't seem to change much over time-- only from WAFB sites
+germ.rt.Burgess <- mean(c(13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
 
-# germination rate from the Burgess paper incorporates both viability and germination. To isoloate just the germination rate, divide the Burgess germination rate by the viability rate
+# germination rate from the Burgess paper incorporates both viability and germination. To isolate just the germination rate, divide the Burgess germination rate by the viability rate
 germ.rt <-germ.rt.Burgess/total_seed_viab.rt  
 
 # the viability rate (proportion of seeds produced by an adult plant that are viable) is the 'total_seed_viab.rt' derived from the Burgess paper results
@@ -274,15 +281,15 @@ for (i in 1:length(plots)) {
     # seeds that stay in the seedbank (staySB) (1 - germ.rt) * 0.9
     seeds_now[1:(round((1-germ.rt)*0.9 * nrow(seeds_now),0)),"SeedBank_tplus1"] <- 1
     # seeds that leave the seedbank (outSB) (germ.rt)
-    seeds_now[seeds_now$SeedBank_tplus1 == 0,][1:round(germ.rt * nrow(seeds_now),0), "Seedling_tplus1"] <- 1 
+    seeds_now[seeds_now$SeedBank_tplus1 == 0,][1:round((germ.rt*.9) * nrow(seeds_now),0), "Seedling_tplus1"] <- 1 
     
     ## seeds that enter the seedbank from the continuous stage (goSB and goSdlng)
     n_newSeeds = sum(dat[dat$Plot_ID==plot_now & dat$Year == year_now,"Num_seeds"], 
                      na.rm = TRUE)
-    # get the number of seeds from the reproductive plants that go into the seedbank (total_seed_viab.rt - germ.rt)
-    n_newGoSB = round((total_seed_viab.rt - germ.rt)*n_newSeeds, 0)
+    # get the number of seeds from the reproductive plants that go into the seedbank (viab.rt - germ.rt)
+    n_newGoSB = round((viab.rt*(1 - germ.rt))*n_newSeeds, 0)
     # get the number of seeds from the reproductive plants that go into the seedling stage (germ.rt)
-    n_newGoSdlng = round(n_newSeeds*germ.rt,0)
+    n_newGoSdlng = round(n_newSeeds*viab.rt * germ.rt,0)
     
     if (n_newSeeds > 0) {
       seeds_now <- rbind(seeds_now, 
@@ -345,5 +352,14 @@ for (i in 1:length(plots)) {
 # put in a 'discrete' stage d.f
 discDat <- seeds.out
 
-# write the discreteDat d.f to file
-#write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
+## calculate the total population size for each quad/year combo
+N_all <- dat_all %>% 
+  group_by(Plot_ID, Year) %>% 
+  summarize(N_all = n())
+# add to the dat_all d.f
+dat_all <- dat_all %>% left_join(N_all)
+
+# # write the discreteDat d.f to file
+write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
+# # also write the continuous seedling d.f to file
+write.csv(x = dat_all, file = "../Processed_Data/allDat_plus_contSeedlings.csv", row.names = FALSE)

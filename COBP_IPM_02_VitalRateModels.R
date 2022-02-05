@@ -11,7 +11,10 @@ library(MASS)
 # (COBP_IPM_01_dataPrep.R)
 source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
 
-#### Vital Rate Models for Deterministic, non-density-dependent IPM with all data####
+#### Vital Rate Models for Deterministic, non-density-dependent IPM with all data ####
+## get the data just for 'adult' plants
+dat <- dat_all[dat_all$seedling !=1,]
+
 ### Make vital rate models 
 ## Survival ($s(z)$)
 # subset the data to exclude flowering individuals
@@ -80,11 +83,9 @@ p.estab.est <- sum(discDat[discDat$Seedling_t == 1, "Recruit_tplus1"], na.rm = T
   sum(discDat["Seedling_t"], na.rm = TRUE)  # number of seedlings in year t
 #sum(estabs$P_estab, na.rm = TRUE)/sum(is.na(estabs$P_estab)==FALSE)
 
-
 ## Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1 ($outSB$--is the 'germ.rt')
-outSB.est <- germ.rt
-  #sum(discDat[discDat$SeedBank_t == 1, "Seedling_tplus1"], na.rm = TRUE) / # number of seedlings in year t+1
-  #sum(discDat[discDat$SeedBank_t == 1, "SeedBank_t"], na.rm = TRUE) # number of seedbank seeds in year t
+outSB.est <- sum(discDat[discDat$SeedBank_t == 1, "Seedling_tplus1"], na.rm = TRUE) / # number of seedlings in year t+1
+  sum(discDat[discDat$SeedBank_t == 1, "SeedBank_t"], na.rm = TRUE) # number of seedbank seeds in year t
 
 ## Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1 ($staySB$)--Burgess, 2005 shows that rate of viability doesn't really decrease much with time
 # (1 - germ.rt) * 0.9
@@ -93,17 +94,191 @@ staySB.est <- sum(discDat[discDat$SeedBank_t == 1, "SeedBank_tplus1"], na.rm = T
 
 ## Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1 ($goSB$)
 # viab.rt (1 - germ.rt) 
-goSB.est <- viab.rt * (1 - germ.rt)
-  #sum(discDat[discDat$NewSeeds_t == 1, "SeedBank_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
-  #sum(discDat[discDat$NewSeeds_t == 1, "NewSeeds_t"], na.rm = TRUE) # number of reproductive seeds in year t
+goSB.est <- 
+  sum(discDat[discDat$NewSeeds_t == 1, "SeedBank_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
+  sum(discDat[discDat$NewSeeds_t == 1, "NewSeeds_t"], na.rm = TRUE) # number of reproductive seeds in year t
 
 ## Probability that a seed from a plant in year t will go directly to the seedling stage ($goSdlng$)
 # use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
 # viab.rt * germ.rt
- goSdlng.est <- viab.rt * germ.rt
-# sum(discDat[discDat$NewSeeds_t == 1, "Seedling_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
-#   sum(discDat[discDat$NewSeeds_t == 1, "NewSeeds_t"], na.rm = TRUE) # number of seedbank seeds in year t
+ goSdlng.est <- 
+ sum(discDat[discDat$NewSeeds_t == 1, "Seedling_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
+   sum(discDat[discDat$NewSeeds_t == 1, "NewSeeds_t"], na.rm = TRUE) # number of seedbank seeds in year t
 
+ #### Vital Rate Models for Deterministic, non-density-dependent IPM with all data + continuous seedlings####
+## the dataset is called 'dat_all'
+ ### Make vital rate models 
+ ## Survival ($s(z)$)
+ # subset the data to exclude flowering individuals
+ survDat_all <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering),]
+ # logistic glm with log-transformed size_t
+ survMod_all <- glm(survives_tplus1 ~ log_LL_t , data = survDat_all, family = binomial)
+ summary(survMod_all)
+ # plot model results 
+ plot(survives_tplus1 ~ log_LL_t, data = survDat_all)
+ newdata <- data.frame("log_LL_t" = seq(from = min(survDat_all$log_LL_t, na.rm = TRUE), 
+                                        to = max(survDat_all$log_LL_t, na.rm = TRUE),
+                                        length.out = 100))
+ lines(x = newdata$log_LL_t, y = predict(object = survMod_all, newdata =  newdata, type = "response"), col = "red")
+ raw_y <- predict(object = survMod_all, newdata =  newdata, type = "link")
+ lines(x = newdata$log_LL_t, y = (1/(1 + exp(-(raw_y)))))
+
+ ## Growth ($G(z',z)$)
+ # lm w/ log-transformed size_t and size_t+1
+ sizeMod_all <- lm(log_LL_tplus1 ~ log_LL_t , data = dat_all)
+ summary(sizeMod_all)
+ # plot model results
+ plot(log_LL_tplus1 ~ log_LL_t, data = dat_all)
+ newdata <- data.frame("log_LL_t" = seq(from = min(dat_all$log_LL_t, na.rm = TRUE), 
+                                        to = max(dat_all$log_LL_t, na.rm = TRUE),
+                                        length.out = 100))
+ lines(x = newdata$log_LL_t, y = predict(object = sizeMod_all, newdata =  newdata), col = "red")
+ lines(x = c(-1,4), y = c(-1,4), col = "darkgrey", lty = 2)
+ 
+ ## Number of seeds produced, according to plant size ($b(z)$)
+ # using size in current year (no. of seeds/plant, for those that flowered ~ size_t)
+ seedDat_all <- dat_all[dat_all$flowering == 1,]
+ # fit a negative binomial glm (poisson was overdispersed)
+ seedMod_all <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_all)
+ summary(seedMod_all)
+ # plot model results
+ plot(Num_seeds ~ log_LL_t, data = seedDat_all)
+ newdata <- data.frame("log_LL_t" = seq(from = min(seedDat_all$log_LL_t, na.rm = TRUE), 
+                                        to = max(seedDat_all$log_LL_t, na.rm = TRUE),
+                                        length.out = 100))
+ lines(x = newdata$log_LL_t, y = predict(object = seedMod_all, newdata =  newdata, type = "response"), col = "red")
+ 
+ ## Flowering probability ($p_b(z)$)
+ # using size in current year (w/ squared term)
+ # logistic glm with log-transformed size_t
+ flwrMod_all <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat_all, family = binomial)))
+ summary(flwrMod_all)
+ # plot model results 
+ plot(flowering ~ log_LL_t, data = dat_all)
+ newdata <- data.frame("log_LL_t" = seq(from = min(dat_all$log_LL_t, na.rm = TRUE), 
+                                        to = max(dat_all$log_LL_t, na.rm = TRUE),
+                                        length.out = 100))
+ lines(x = newdata$log_LL_t, y = predict(object = flwrMod_all, newdata =  newdata, type = "response"), col = "red")
+ lines(x = meshp, y = FL.fun(meshp))
+ 
+ ## Distribution of recruit size ($c_o(z')$)
+ # subset the data
+ recD_all <- dat_all[dat_all$seedling == 1,]
+ # plot the data
+ hist((recD_all$log_LL_t))
+ plot(density(recD_all$log_LL_t), ylim = c(0,5))
+ 
+ recMod_all <- lm(log_LL_t ~ 1, data = recD_all)
+ summary(recMod_all)
+ #plot the results
+ abline(v = recMod_all$coefficients, col = "blue", lwd = 2)
+ 
+## Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1 ($outSB$--is the 'germ.rt')
+ outSB_all <- germ.rt * .9 # (???)
+ 
+## Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1 ($staySB$)--Burgess, 2005 shows that rate of viability doesn't really decrease much with time
+ # (1 - germ.rt) * 0.9
+ staySB_all<- (1-germ.rt) * .9
+ 
+ ## Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1 ($goSB$)
+ # viab.rt (1 - germ.rt) 
+ goSB_all <- viab.rt * (1 - germ.rt)
+ 
+ ## Probability that a seed from a plant in year t will go directly to the continous stage ($goCont$)
+ # use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
+ # viab.rt * germ.rt
+ goCont_all <- viab.rt * germ.rt
+ 
+ #### Vital Rate Models for Deterministic, density-dependent IPM with all data + continuous seedlings####
+ ## the dataset is called 'dat_all'
+ ### Make vital rate models 
+ ## Survival ($s(z)$)
+ # subset the data to exclude flowering individuals
+ survDat_N <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering),]
+ # logistic glm with log-transformed size_t
+ survMod_N <- glm(survives_tplus1 ~ log_LL_t + N_all , data = survDat_N, family = binomial)
+ summary(survMod_N)
+ # plot model results 
+ plot(survives_tplus1 ~ log_LL_t, data = survDat_N)
+ newdata <- data.frame("log_LL_t" = seq(from = min(survDat_N$log_LL_t, na.rm = TRUE), 
+                                        to = max(survDat_N$log_LL_t, na.rm = TRUE),
+                                        length.out = 100),  
+                       "N_all" = seq(from = min(survDat_N$N_all, na.rm = TRUE),
+                                     to = max(survDat_N$N_all, na.rm = TRUE), 
+                                     length.out = 100))
+ lines(x = newdata$log_LL_t, y = predict(object = survMod_N, newdata =  newdata, type = "response"), col = "red")
+ 
+ ## Growth ($G(z',z)$)
+ # lm w/ log-transformed size_t and size_t+1
+ sizeMod_N <- lm(log_LL_tplus1 ~ log_LL_t + N_all, data = dat_all)
+ summary(sizeMod_N)
+ # plot model results
+ plot(log_LL_tplus1 ~ log_LL_t, data = dat_all)
+ newdata <- data.frame("log_LL_t" = seq(from = min(dat_all$log_LL_t, na.rm = TRUE), 
+                                        to = max(dat_all$log_LL_t, na.rm = TRUE),
+                                        length.out = 100),
+                       "N_all" = seq(from = min(dat_all$N_all, na.rm = TRUE),
+                                     to = max(dat_all$N_all, na.rm = TRUE),
+                                     length.out = 100))
+ lines(x = newdata$log_LL_t, y = predict(object = sizeMod_N, newdata =  newdata), col = "red")
+ lines(x = c(-1,4), y = c(-1,4), col = "darkgrey", lty = 2)
+ 
+ ## Number of seeds produced, according to plant size ($b(z)$)
+ # using size in current year (no. of seeds/plant, for those that flowered ~ size_t)
+ seedDat_N <- dat_all[dat_all$flowering == 1,]
+ # fit a negative binomial glm (poisson was overdispersed)
+ seedMod_N <- MASS::glm.nb(Num_seeds ~ log_LL_t, data = seedDat_N)
+ summary(seedMod_N)
+ # plot model results
+ plot(Num_seeds ~ log_LL_t, data = seedDat_all)
+ newdata <- data.frame("log_LL_t" = seq(from = min(seedDat_N$log_LL_t, na.rm = TRUE), 
+                                        to = max(seedDat_N$log_LL_t, na.rm = TRUE),
+                                        length.out = 100))
+ lines(x = newdata$log_LL_t, y = predict(object = seedMod_N, newdata =  newdata, type = "response"), col = "red")
+ 
+ ## Flowering probability ($p_b(z)$)
+ # using size in current year (w/ squared term)
+ # logistic glm with log-transformed size_t
+ flwrMod_N <- suppressWarnings(glm(flowering ~ log_LL_t + I(log_LL_t^2) + N_all,
+                                    data = dat_all, family = binomial))
+ summary(flwrMod_N)
+ # plot model results 
+ plot(flowering ~ log_LL_t, data = dat_all)
+ newdata <- data.frame("log_LL_t" = seq(from = min(dat_all$log_LL_t, na.rm = TRUE), 
+                                        to = max(dat_all$log_LL_t, na.rm = TRUE),
+                                        length.out = 100),
+                       "N_all" = seq(from = min(dat_all$N_all, na.rm = TRUE),
+                                     to = max(dat_all$N_all, na.rm = TRUE),
+                                     length.out = 100)
+                       )
+ lines(x = newdata$log_LL_t, y = predict(object = flwrMod_N, newdata =  newdata, type = "response"), col = "red")
+ 
+ ## Distribution of recruit size ($c_o(z')$)
+ # subset the data
+ recD_all <- dat_all[dat_all$seedling == 1,]
+ # fit the model
+ recMod_N <- lm(log_LL_t ~ 1, data = recD_all)
+ summary(recMod_N)
+ #plot the results
+ hist(recD_all$log_LL_t)
+ abline(v = recMod_all$coefficients, col = "blue", lwd = 2)
+ 
+ ## Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1 ($outSB$--is the 'germ.rt')
+ outSB_all <- germ.rt * .9
+ 
+ ## Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1 ($staySB$)--Burgess, 2005 shows that rate of viability doesn't really decrease much with time
+ # (1 - germ.rt) * 0.9
+ staySB_all<- (1-germ.rt) * .9
+ 
+ ## Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1 ($goSB$)
+ # viab.rt (1 - germ.rt) 
+ goSB_all <- viab.rt * (1 - germ.rt)
+ 
+ ## Probability that a seed from a plant in year t will go directly to the continous stage ($goCont$)
+ # use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
+ # viab.rt * germ.rt
+ goCont_all <- viab.rt * germ.rt
+ 
 #### Vital Rate Models for deterministic, density-independent IPM with FIRST HALF OF DATA ####
 ## subset data for years 2018-2019
 dat_first <- dat[dat$Year %in% c(2018),]
@@ -375,6 +550,7 @@ for (i in 1:length(siteNames)) {
   }
 ## use uniform p.estab, outSB, staySB, and goSB estimates
 
+#%%%AES%%% make a 
 #### Models by site (deterministic, no env covariates, DD) ####
 ### Make vital rate models (put inside a for-loop; store models in a list)
 # make an empty list to hold models
