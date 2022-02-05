@@ -79,31 +79,34 @@ abline(v = recMod$coefficients, col = "blue", lwd = 2)
 ## Probability of a seedling in year *t* establishing to a rosette in year *t+1* ($p_{estab}$)
 # data.source is 'estabs' 
 # calculate the probability of establishment value
-p.estab.est <- sum(discDat[discDat$Seedling_t == 1, "Recruit_tplus1"], na.rm = TRUE)  / # number of new continuous stage recruits in t+1
-  sum(discDat["Seedling_t"], na.rm = TRUE)  # number of seedlings in year t
-#sum(estabs$P_estab, na.rm = TRUE)/sum(is.na(estabs$P_estab)==FALSE)
+ p.estab.est <- mean(estabs$P_estab, na.rm = TRUE)
+# sum(discDat[discDat$Seedling_t == 1, "Recruit_tplus1"], na.rm = TRUE)  / # number of new continuous stage recruits in t+1
+#   sum(discDat["Seedling_t"], na.rm = TRUE)  # number of seedlings in year t
+# #sum(estabs$P_estab, na.rm = TRUE)/sum(is.na(estabs$P_estab)==FALSE)
 
 ## Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1 ($outSB$--is the 'germ.rt')
-outSB.est <- sum(discDat[discDat$SeedBank_t == 1, "Seedling_tplus1"], na.rm = TRUE) / # number of seedlings in year t+1
-  sum(discDat[discDat$SeedBank_t == 1, "SeedBank_t"], na.rm = TRUE) # number of seedbank seeds in year t
+ outSB.est <- germ.rt *  .9
+# sum(discDat[discDat$SeedBank_t == 1, "Seedling_tplus1"], na.rm = TRUE) / # number of seedlings in year t+1
+#   sum(discDat[discDat$SeedBank_t == 1, "SeedBank_t"], na.rm = TRUE) # number of seedbank seeds in year t
 
 ## Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1 ($staySB$)--Burgess, 2005 shows that rate of viability doesn't really decrease much with time
 # (1 - germ.rt) * 0.9
-staySB.est <- sum(discDat[discDat$SeedBank_t == 1, "SeedBank_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
-  sum(discDat[discDat$SeedBank_t == 1, "SeedBank_t"], na.rm = TRUE) # number of seedbank seeds in year t
+staySB.est <- (1 - germ.rt) * 0.9
+  # sum(discDat[discDat$SeedBank_t == 1, "SeedBank_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
+  # sum(discDat[discDat$SeedBank_t == 1, "SeedBank_t"], na.rm = TRUE) # number of seedbank seeds in year t
 
 ## Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1 ($goSB$)
 # viab.rt (1 - germ.rt) 
-goSB.est <- 
-  sum(discDat[discDat$NewSeeds_t == 1, "SeedBank_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
-  sum(discDat[discDat$NewSeeds_t == 1, "NewSeeds_t"], na.rm = TRUE) # number of reproductive seeds in year t
+goSB.est <- viab.rt * (1 - germ.rt) 
+  # sum(discDat[discDat$NewSeeds_t == 1, "SeedBank_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
+  # sum(discDat[discDat$NewSeeds_t == 1, "NewSeeds_t"], na.rm = TRUE) # number of reproductive seeds in year t
 
 ## Probability that a seed from a plant in year t will go directly to the seedling stage ($goSdlng$)
 # use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
 # viab.rt * germ.rt
- goSdlng.est <- 
- sum(discDat[discDat$NewSeeds_t == 1, "Seedling_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
-   sum(discDat[discDat$NewSeeds_t == 1, "NewSeeds_t"], na.rm = TRUE) # number of seedbank seeds in year t
+ goSdlng.est <- viab.rt * germ.rt
+ # sum(discDat[discDat$NewSeeds_t == 1, "Seedling_tplus1"], na.rm = TRUE) / # number of seedbank seeds in year t+1
+ #   sum(discDat[discDat$NewSeeds_t == 1, "NewSeeds_t"], na.rm = TRUE) # number of seedbank seeds in year t
 
  #### Vital Rate Models for Deterministic, non-density-dependent IPM with all data + continuous seedlings####
 ## the dataset is called 'dat_all'
