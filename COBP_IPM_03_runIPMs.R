@@ -187,7 +187,7 @@ contSeedlings_IPM <- init_ipm(sim_gen   = "general",
   ) %>% 
   define_kernel(
     name          = "F", 
-    formula       = p_b. * b. * goCont. * c_o. * d_size,
+    formula       = goCont. * (p_b. * b. * c_o. * d_size),
     
     p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
     b.            = exp(b_int + b_slope * size_1),
@@ -226,7 +226,7 @@ contSeedlings_IPM <- init_ipm(sim_gen   = "general",
     evict_cor     = FALSE
   )   %>% define_kernel(
     name          = "continuous_to_seedbank", 
-    formula       = p_b. * b. * goSB. * d_size,
+    formula       = goSB.  * (p_b. * b. * d_size),
     
     p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
     b.            = exp(b_int + b_slope * size_1),
@@ -255,13 +255,15 @@ contSeedlings_IPM <- init_ipm(sim_gen   = "general",
   ) %>% 
   define_pop_state(
     n_size = runif(500),
-    n_b = 400
+    n_b = 400, 
+    
   ) %>% 
   make_ipm(
-    iterations = 100
+    normalize_pop_size = FALSE
+    #iterations = 100
   )
 
-lambda(contSeedlings_IPM)
+ipmr::lambda(contSeedlings_IPM)
 ## check for eviction from the model
 #To check for eviction, we plot the survival model and the column sums of the survival/growth (P) matrix. Eviction occurs when the column sums are lower than the survival models suggests that they should be.
 # define the x-axis values
@@ -406,9 +408,14 @@ preds <- predict(object = survMod_all, newdata = data.frame("log_LL_t" = meshpts
 plot(x = meshpts, y = preds, ylab = "Survival Probability", type = "l")
 # plot the survival values from the P matrix (column sums)
 points(meshpts,apply(contSeedlings_IPM$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
+
 #### Deterministic, density-independent IPM for all data ####
 # vital-rate model names: survMod, sizeMod, seedMod_t, flwrMod_t, recMod, p.estab.est, outSB.est, staySB.est, goSB.est, goSdlng.est 
 
+## define the bounds of the IPM
+L <-  log(0.1)* 1.2 # lower bound (L)
+U <- max(dat$log_LL_t, na.rm = TRUE) * 1.2 # upper bound (U)
+n <- 500 
 ### Implement the IPM 
 # use ipmr to fit the IPM
 ## Set up the initial population conditions and parameters (example w/ only one discrete stage and dummy seedbank rates)
@@ -542,7 +549,7 @@ det_ipm <- init_ipm(sim_gen = "general", # make a general IPM
 ## If we are worried about whether or not the model converged to stable dynamics, we can use the exported utility is_conv_to_asymptotic. The default tolerance for convergence is 1e-10, but can be changed with the 'tol' argument.
 is_conv_to_asymptotic(det_ipm, tol = 1e-10)
 ## additional calculations
-lambda_ipmr <- lambda(det_ipm)
+lambda_ipmr <- s
 repro_value <- left_ev(det_ipm)
 stable_dist <- right_ev(det_ipm)
 

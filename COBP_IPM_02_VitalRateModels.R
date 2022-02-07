@@ -162,7 +162,6 @@ goSB.est <- viab.rt * (1 - germ.rt)
                                         to = max(dat_all$log_LL_t, na.rm = TRUE),
                                         length.out = 100))
  lines(x = newdata$log_LL_t, y = predict(object = flwrMod_all, newdata =  newdata, type = "response"), col = "red")
- lines(x = meshp, y = FL.fun(meshp))
  
  ## Distribution of recruit size ($c_o(z')$)
  # subset the data

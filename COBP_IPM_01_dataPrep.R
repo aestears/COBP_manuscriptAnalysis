@@ -360,6 +360,6 @@ N_all <- dat_all %>%
 dat_all <- dat_all %>% left_join(N_all)
 
 # # write the discreteDat d.f to file
-write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
+#write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
 # # also write the continuous seedling d.f to file
-write.csv(x = dat_all, file = "../Processed_Data/allDat_plus_contSeedlings.csv", row.names = FALSE)
+#write.csv(x = dat_all, file = "../Processed_Data/allDat_plus_contSeedlings.csv", row.names = FALSE)
