@@ -540,7 +540,7 @@ det_ipm <- init_ipm(sim_gen = "general", # make a general IPM
       n_s  = init_seedlings 
     )
   ) %>%
-  make_ipm(iterations = 100,
+  make_ipm(#iterations = 100,
            normalize_pop_size = FALSE,
            usr_funs = list(inv_logit   = inv_logit), return_main_env = TRUE )
 
@@ -549,7 +549,7 @@ det_ipm <- init_ipm(sim_gen = "general", # make a general IPM
 ## If we are worried about whether or not the model converged to stable dynamics, we can use the exported utility is_conv_to_asymptotic. The default tolerance for convergence is 1e-10, but can be changed with the 'tol' argument.
 is_conv_to_asymptotic(det_ipm, tol = 1e-10)
 ## additional calculations
-lambda_ipmr <- s
+lambda_ipmr <- ipmr::lambda(det_ipm)
 repro_value <- left_ev(det_ipm)
 stable_dist <- right_ev(det_ipm)
 

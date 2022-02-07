@@ -241,9 +241,7 @@ lines(IPM.true$meshpts, stable.z.dist.true/diff(IPM.true$meshpts)[1], col = "red
 #### hand-calculated model for continuous-ized seedlings and discrete seedbank ####
 # Density Independent 
 
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#### Section 1 - Define the demographic functions and parameters ####
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### Define the demographic functions and parameters ###
 ## (Code below is modified from Maria Paniw)
 
 # Empty list to save model coefficients 
@@ -266,10 +264,6 @@ paramCont[[5]]=as.matrix(coef(seedMod_all))
 
 # name the paramCont list to keep track of coefficients
 names(paramCont) <- c("survival", "growth", "recruitDist", "flowering", "seedProduction")
-
-###########################################################################
-### PART B - IPM and SIMULATIONS BASED ON KERNEL SELECTION
-##########################################################################
 
 # Construct an IPM kernel K using the parameters we obtained from the models
 
@@ -335,7 +329,6 @@ FL.fun <- function(z) {
   
   return(1/(1+ exp(-(mu.fl))))
 }
-
 
 # SEED PRODUCTION
 
@@ -446,6 +439,181 @@ K <- array(0,c(n+1,n+1))
   lines(x = meshp, y = Fkernel.discr[2:501])
   # not the same :-( 
   
+library(popbio)
+
+popbio::lambda(mat)
+eigenList <- eigen.analysis(mat)
+
+## the labmda is the same between the ipmr version and this one!! yay! 
+
+#### hand-calculated model for discrete seedlings and discrete seedbank ####
+# Density Independent 
+###Define the demographic functions and parameters ###
+
+## (Code below is modified from Maria Paniw)
+
+# Empty list to save model coefficients 
+param_list <- list(
+  g_int     = coef(sizeMod)[1],
+  g_slope   = coef(sizeMod)[2],
+  g_sd      = summary(sizeMod)$sigma,
+  s_int     = coef(survMod)[1],
+  s_slope   = coef(survMod)[2],
+  p_b_int   = coef(flwrMod_t)[1], #probability of flowering
+  p_b_slope = coef(flwrMod_t)[2],
+  p_b_slope_2 = coef(flwrMod_t)[3],
+  b_int   = coef(seedMod_t)[1], #seed production
+  b_slope = coef(seedMod_t)[2],
+  c_o_mu    = coef(recMod), #recruit size distribution
+  c_o_sd    = summary(recMod)$sigma,
+  goSdlng   = goSdlng.est, # Probability that non-seedbank seeds will germinate into seedlings in year t+1
+  staySB = staySB.est, # Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
+  goSB = goSB.est, # probability that a seed produced by an adult plant in year t will enter the seedbank
+  outSB = outSB.est, # probability that a seedbank seed will germinate to a seedling in year t+1
+  p_estab = p.estab.est # probability that a seedling will establish into a rosette in t+1
+)
+
+# Construct an IPM kernel K using the parameters we obtained from the models
+# First define the elements that make up the IPM (vital rates):
+
+# SURVIVAL:
+S.fun <- function(z) {
+  
+  mu.surv = param_list$s_int+ param_list$s_slope *z
+  
+  return(1/(1 + exp(-(mu.surv))))
+}
+
+# GROWTH (we assume a constant variance)
+GR.fun <- function(z,zz){
+  
+  growth.mu = param_list$g_int + param_list$g_slope * z
+
+  # makes more sense to me... (got the same answer)
+  return(dnorm(zz, mean = growth.mu, sd = param_list$g_sd))
+}
+
+## SEEDLING SIZES (same approach as in growth function)
+SDS.fun <- function(zz){
+  
+  # I'll do it differently, since our distribution of seedling size is different
+  rec_mu <- param_list$c_o_mu
+  rec_sd <- param_list$c_o_sd
+  
+  return(dnorm(zz, mean = rec_mu, sd = rec_sd))
+}
+
+# PROBABILITY OF FLOWERING 
+FL.fun <- function(z) {
+  
+  mu.fl = param_list$p_b_int + param_list$p_b_slope * z + param_list$p_b_slope_2 * (z^2)
+  
+  return(1/(1+ exp(-(mu.fl))))
+}
+
+# SEED PRODUCTION
+SDP.fun <- function(z) {
+  
+  mu.fps = exp(param_list$b_int + param_list$b_slope * z)
+    
+  return(mu.fps)
+}
+
+# Second, put together the kernels - four kernels for four years:
+years <- 1 # for right now, treating everything as one year
+
+# Define the lower and upper integration limit
+L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
+U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
+
+n <-500 # bins
+
+# These are the parameters for the discrete stages
+# I usually only have seed banks (SB), but now I added a seedling stage
+
+outSB <- param_list$outSB #SB to continuous stage
+staySB <- param_list$staySB # staying in SB
+goSdlng <- param_list$goSdlng # seeds become continuous right away (without going to the seed bank) 
+goSB <- param_list$goSB # seeds go to the seedbank
+p_estab <- param_list$p_estab 
+
+K <- array(0,c(n+2,n+2))
+
+# I recommend you set i = 1, set n low to say 10 
+
+# Setting up the kernels
+b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+
+h=(U-L)/n # bin width 
+
+# Survival and growth 
+S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal of the matrix
+G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
+
+#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+
+#Probability of flowering
+Pb = (FL.fun(meshp))
+
+#Number of seeds produced according to adult size
+b = (SDP.fun(meshp))
+
+FecALL= Pb * b
+
+# update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+S_new <- S * (1-Pb)
+
+# Control for eviction:
+# this is equivalent to redistributing evicted sizes evenly among existing size classes 
+G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+
+# make the continuous part of the P matrix
+Pkernel.cont <- as.matrix(G %*% S_new)
+
+# seedbank (first column of your K)
+Pkernel.seedbank = c(staySB,outSB, rep(0, length.out = n)) # seeds survive and go to seedlings
+Pkernel.seedlings = c(0, 0, p_estab*c_o[,1])
+# Make the full P kernel
+Pkernel <- cbind(Pkernel.seedbank, Pkernel.seedlings, rbind(rep(0,length(meshp)),rbind(rep(0,length(meshp))), Pkernel.cont)) # discrete component
+
+## make the F kernel
+# the continuous F matrix is all zeros (can't go directly to continuous stage from continuous stage)
+Fkernel.cont <-  matrix(0, nrow = n, ncol = n) # the size of seedlings that go into the seed bank from each contiuous size class
+
+Fkernel.seedbank  <- h * matrix(c(0, 0, goSB * FecALL), nrow = 1)
+
+Fkernel.seedlings <- h * matrix(c(0, 0, goSdlng * FecALL), nrow = 1)
+
+Fkernel <- rbind(Fkernel.seedbank, Fkernel.seedlings, cbind(rep(0, length.out = n),rep(0, length.out = n), Fkernel.cont))
+
+mat <-Pkernel+Fkernel
+
+eigenMat <- eigen(mat)
+# get the lambda
+eigenMat$values[1]
+
+eigenMat$vectors
+
+## 
+## 
+# compare the P and F continuous kernels
+# the continuous part of the P kernel is the same between the ipmr and by-hand models! 
+Pkernel.cont - contSeedlings_IPM$sub_kernels$P
+# the contiuous F kernel and the ipmr F kernela are the same! 
+Fkernel.cont - contSeedlings_IPM$sub_kernels$F
+
+# compare the distributions for disc transitions
+plot(x = meshp, y = contSeedlings_IPM$sub_kernels$seedbank_to_continuous, type = 'l')
+lines(x = meshp, y = mat[2:501,1])
+# the same! 
+
+plot(x = meshp, y = contSeedlings_IPM$sub_kernels$continuous_to_seedbank, type = 'l')
+lines(x = meshp, y = Fkernel.discr[2:501])
+# not the same :-( 
+
 library(popbio)
 
 popbio::lambda(mat)
