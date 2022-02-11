@@ -202,7 +202,7 @@ contSeedlings_IPM <- init_ipm(sim_gen   = "general",
     evict_fun     = truncated_distributions("norm", "c_o.")
   ) %>% define_kernel(
     name          = "seedbank_to_continuous", 
-    formula       = outSB. * c_o. * d_size,
+    formula       = outSB. * c_o. ,
     
     c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
     outSB.       = outSB,
@@ -465,7 +465,7 @@ det_ipm <- init_ipm(sim_gen = "general", # make a general IPM
   ) %>%
   define_kernel(
     name          = "leave_seedlings", ## leave seedling stage and go to rosette stage
-    formula       = p_estab. * c_o. * d_ht,
+    formula       = p_estab. * c_o. ,
     family        = 'DC', # Note that now, family = "DC" because it denotes a discrete -> continuous transition
     p_estab.      = p_estab,
     c_o.          = dnorm(ht_2, c_o_mu, c_o_sd),

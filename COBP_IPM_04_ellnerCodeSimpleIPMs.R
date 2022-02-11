@@ -407,8 +407,7 @@ K <- array(0,c(n+1,n+1))
   Fkernel.cont <-  as.matrix(goCont * ( c_o %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each contiuous size class
   # multiply the continuous kernel by the binwidth (h)
   #Fkernel.cont <- as.matrix(h * Fkernel.cont)
-  Fkernel.cont_test <-  h * (goCont * (outer(meshp, meshp, F_cont_fun)))
-    
+ 
   Fkernel.discr  <- h * matrix(c(0, goSB * FecALL), nrow = 1)
   # multiply the cont_to_disc distribution by the binwidth (h)
   #Fkernel.discr <- as.matrix(h * Fkernel.discr)
@@ -445,6 +444,98 @@ popbio::lambda(mat)
 eigenList <- eigen.analysis(mat)
 
 ## the labmda is the same between the ipmr version and this one!! yay! 
+
+#### second try at the by-hand model for only one discrete stage ####
+# using code from Paniw, et al. paper w/ Dewey Pine
+
+# use functions and parameters from previous chunk
+K <- array(0,c(n+1,n+1))
+
+# I recommend you set i = 1, set n low to say 10 
+
+# Setting up the kernels
+b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+
+h=(U-L)/n # bin width 
+
+# Survival and growth 
+S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal of the matrix
+G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
+# G <- t(outer(meshp,meshp,GR.fun)) # Growth
+
+#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+# c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+
+#Probability of flowering
+Pb = (FL.fun(meshp))
+
+#Number of seeds produced according to adult size
+b_seed = (SDP.fun(meshp))
+
+FecALL= Pb * b_seed
+
+# update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+S_new <- S * (1-Pb)
+
+# Control for eviction:
+# this is equivalent to redistributing evicted sizes evenly among existing size classes 
+G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+
+# make the continuous part of the P matrix
+Pkernel.cont <- as.matrix(G %*% S_new)
+# multiply the continuous kernel by the binwidth (h)
+# Pkernel.cont <- h * Pkernel.cont
+
+# seedbank (first column of your K)
+Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+
+# Make the full P kernel
+Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+
+## make the F kernel
+Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+# multiply the continuous kernel by the binwidth (h)
+#Fkernel.cont <- as.matrix(h * Fkernel.cont)
+
+Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+# multiply the cont_to_disc distribution by the binwidth (h)
+#Fkernel.discr <- as.matrix(h * Fkernel.discr)
+Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+
+mat <-Pkernel+Fkernel
+
+eigenMat <- eigen(mat)
+# get the lambda
+eigenMat$values[1]
+
+eigenMat$vectors
+
+## 
+## 
+# compare the P and F continuous kernels
+# the continuous part of the P kernel is the same between the ipmr and by-hand models! 
+Pkernel.cont - contSeedlings_IPM$sub_kernels$P
+# the contiuous F kernel and the ipmr F kernela are the same! 
+Fkernel.cont - contSeedlings_IPM$sub_kernels$F
+
+# compare the distributions for disc transitions
+plot(x = meshp, y = contSeedlings_IPM$sub_kernels$seedbank_to_continuous, type = 'l')
+lines(x = meshp, y = mat[2:501,1])
+lines(x = meshp, y = c( outSB*c_o[,1])/h)
+# the same! 
+
+plot(x = meshp, y = contSeedlings_IPM$sub_kernels$continuous_to_seedbank, type = 'l')
+lines(x = meshp, y = Fkernel.discr[2:501])
+lines(x = meshp, y = matrix(c( goSB * h * (FecALL)), nrow = 1))
+# not the same :-( 
+
+library(popbio)
+
+popbio::lambda(mat)
+eigenList <- eigen.analysis(mat)
 
 #### hand-calculated model for discrete seedlings and discrete seedbank ####
 # Density Independent 
@@ -552,7 +643,8 @@ S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal 
 G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
 
 #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
-c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+#c_o <-  SDS.fun(meshp) # don't multiply by h, since it's not
+c_o <- h *  matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
 
 #Probability of flowering
 Pb = (FL.fun(meshp))
@@ -568,24 +660,24 @@ S_new <- S * (1-Pb)
 # Control for eviction:
 # this is equivalent to redistributing evicted sizes evenly among existing size classes 
 G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
-c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+# c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
 # seedbank (first column of your K)
 Pkernel.seedbank = c(staySB,outSB, rep(0, length.out = n)) # seeds survive and go to seedlings
-Pkernel.seedlings = c(0, 0, p_estab*c_o[,1])
+Pkernel.seedlings = c(0, 0, p_estab*c_o[,1]) # 
 # Make the full P kernel
-Pkernel <- cbind(Pkernel.seedbank, Pkernel.seedlings, rbind(rep(0,length(meshp)),rbind(rep(0,length(meshp))), Pkernel.cont)) # discrete component
+Pkernel <- cbind(Pkernel.seedbank, Pkernel.seedlings, rbind(rep(0,length(meshp)),rep(0,length(meshp)), Pkernel.cont)) # discrete component
 
 ## make the F kernel
 # the continuous F matrix is all zeros (can't go directly to continuous stage from continuous stage)
 Fkernel.cont <-  matrix(0, nrow = n, ncol = n) # the size of seedlings that go into the seed bank from each contiuous size class
 
-Fkernel.seedbank  <- h * matrix(c(0, 0, goSB * FecALL), nrow = 1)
+Fkernel.seedbank  <- matrix(c(0, 0, goSB * FecALL), nrow = 1)
 
-Fkernel.seedlings <- h * matrix(c(0, 0, goSdlng * FecALL), nrow = 1)
+Fkernel.seedlings <- matrix(c(0, 0, goSdlng * FecALL), nrow = 1)
 
 Fkernel <- rbind(Fkernel.seedbank, Fkernel.seedlings, cbind(rep(0, length.out = n),rep(0, length.out = n), Fkernel.cont))
 
@@ -600,19 +692,30 @@ eigenMat$vectors
 ## 
 ## 
 # compare the P and F continuous kernels
-# the continuous part of the P kernel is the same between the ipmr and by-hand models! 
-Pkernel.cont - contSeedlings_IPM$sub_kernels$P
+# the continuous part of the P kernel is the same between the ipmr and by-hand models! (basically the same)
+Pkernel.cont - det_ipm$sub_kernels$P
 # the contiuous F kernel and the ipmr F kernela are the same! 
-Fkernel.cont - contSeedlings_IPM$sub_kernels$F
+Fkernel.cont - det_ipm$sub_kernels$F
 
 # compare the distributions for disc transitions
-plot(x = meshp, y = contSeedlings_IPM$sub_kernels$seedbank_to_continuous, type = 'l')
-lines(x = meshp, y = mat[2:501,1])
+plot(x = meshp, y = (data_list$p_estab * dnorm(meshp, data_list$c_o_mu, data_list$c_o_sd)), type = 'l')
+lines(x = meshp, y = det_ipm$sub_kernels$leave_seedlings, col = "red")
+lines(x = meshp, y = param_list$p_estab * dnorm(meshp, param_list$c_o_mu, param_list$c_o_sd))
+lines(x = meshp, y = param_list$p_estab * SDS.fun(meshp))
+lines(x = meshp, y = Pkernel.seedlings[3:502], col = "blue" ,lty = 2)
+lines(x = meshp, y = SDS.fun(meshp) * p_estab)
+lines(x = meshp, y = mat[3:502,2])
+lines(x = meshp, y = c_o[,1])
+lines(x = meshp, y = h*c_o[,1])
 # the same! 
 
-plot(x = meshp, y = contSeedlings_IPM$sub_kernels$continuous_to_seedbank, type = 'l')
-lines(x = meshp, y = Fkernel.discr[2:501])
-# not the same :-( 
+plot(x = meshp, y = det_ipm$sub_kernels$repro_to_seedlings, type = 'l')
+lines(x = meshp, y = Fkernel.seedlings[3:502])
+# the same!
+
+plot(x = meshp, y = det_ipm$sub_kernels$repro_to_seedbank, type = 'l')
+lines(x = meshp, y = Fkernel.seedbank[3:502])
+# the same!
 
 library(popbio)
 
