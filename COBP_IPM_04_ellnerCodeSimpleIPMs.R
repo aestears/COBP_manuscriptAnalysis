@@ -192,27 +192,189 @@ eigenMat$vectors
 
 ## 
 ## 
-# compare the P and F continuous kernels
-# the continuous part of the P kernel is the same between the ipmr and by-hand models! 
-Pkernel.cont - contSeedlings_IPM$sub_kernels$P
-# the contiuous F kernel and the ipmr F kernela are the same! 
-Fkernel.cont - contSeedlings_IPM$sub_kernels$F
-
-# compare the distributions for disc transitions
-plot(x = meshp, y = contSeedlings_IPM$sub_kernels$seedbank_to_continuous, type = 'l')
-lines(x = meshp, y = mat[2:501,1])
-lines(x = meshp, y = c( outSB*c_o[,1])/h)
-# the same! 
-
-plot(x = meshp, y = contSeedlings_IPM$sub_kernels$continuous_to_seedbank, type = 'l')
-lines(x = meshp, y = Fkernel.discr[2:501])
-lines(x = meshp, y = matrix(c( goSB * h * (FecALL)), nrow = 1))
-# not the same :-( 
 
 library(popbio)
 
 popbio::lambda(mat)
 eigenList <- eigen.analysis(mat)
+
+## calculate the uncertainty using bootstrapping
+# make a vector to hold all of the lambdas from the resampling runs
+allDI_lambdas <- numeric(200L)
+# make a list to hold the model parameters
+paramCont_now <- list()
+allDI_params <- list()
+# set seedbank parameters, which don't change
+outSB <- outSB_all #SB to continuous stage
+staySB <- staySB_all # staying in SB
+goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
+goSB <- goSB_all # seeds go to the seedbank
+surv.seeds <-  0.9 # survival of seeds
+# Now, we refit the vital rate models, and refit the IPM
+for(i in 1:200) {
+  ## sample continuous data
+  sample_ind <- seq(1, nrow(dat_all), by = 1)
+  
+  boot_data_ind   <- sample(sample_ind, size = 6000, replace = TRUE)
+  
+  boot_data <- dat_all[boot_data_ind,]
+  
+  ## fit vital rate models
+  ## Survival ($s(z)$)
+  survDat_now <- boot_data[boot_data$flowering==0 | is.na(boot_data$flowering),]
+  survMod_now <- glm(survives_tplus1 ~ log_LL_t , data = survDat_now, family = binomial)
+  ## Growth ($G(z',z)$)
+  sizeMod_now <- lm(log_LL_tplus1 ~ log_LL_t , data = boot_data)
+  ## Number of seeds produced, according to plant size ($b(z)$)
+  seedDat_now <- boot_data[boot_data$flowering==1,]
+  # fit poisson glm (for count data)
+  seedMod_now <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_now)
+  ## Flowering probability ($p_b(z)$)
+  flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = boot_data, family = binomial)))
+  ## Distribution of recruit size ($c_o(z')$)
+  # subset the data
+  recD_now <- boot_data[boot_data$seedling == 1,]
+  # fit the model
+  recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
+ 
+  # update the parameter list with parameters from this iteration
+  
+  # survival model is called 'survMod_all'
+  paramCont_now[[1]]=as.matrix(coef(survMod_now)) # save coefficients 
+  
+  # growth model is called 'sizeMod_all'
+  paramCont_now[[2]]=cbind(as.matrix(coef(sizeMod_now)),sd(residuals(sizeMod_now))) # the third column is for the standard deviation of growth 
+  
+  # seedling size distribution is a uniform distribution (of exp(size_2)) with a min of 0.1 and a max 0f 3
+  paramCont_now[[3]]= cbind(as.matrix(coef(recMod_now)), sd(residuals(recMod_now)))
+  
+  # model for probability of flowering is flwrMod_all
+  paramCont_now[[4]]=as.matrix(coef(flwrMod_now))
+  
+  # model for seed production per plant (if reproductive) is seedMod_all
+  paramCont_now[[5]]=as.matrix(coef(seedMod_now))
+  
+  # name the paramCont list to keep track of coefficients
+  names(paramCont) <- c("survival", "growth", "recruitDist", "flowering", "seedProduction")
+  
+  # Insert the new vital rate models into the proto_ipm, then rebuild the IPM.
+  K_now <- array(0,c(n+1,n+1))
+  
+  # I recommend you set i = 1, set n low to say 10 
+  
+  # Setting up the kernels
+  b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+  meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+  
+  h=(U-L)/n # bin width 
+  
+  # Survival and growth 
+  S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal of the matrix
+  G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
+  # G <- t(outer(meshp,meshp,GR.fun)) # Growth
+  
+  #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+  c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+  # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+  
+  #Probability of flowering
+  Pb = (FL.fun(meshp))
+  
+  #Number of seeds produced according to adult size
+  b_seed = (SDP.fun(meshp))
+  
+  FecALL= Pb * b_seed
+  
+  # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+  S_new <- S * (1-Pb)
+  
+  # Control for eviction:
+  # this is equivalent to redistributing evicted sizes evenly among existing size classes 
+  G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  
+  # make the continuous part of the P matrix
+  Pkernel.cont <- as.matrix(G %*% S_new)
+  # multiply the continuous kernel by the binwidth (h)
+  # Pkernel.cont <- h * Pkernel.cont
+  
+  # seedbank (first column of your K)
+  Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+  
+  # Make the full P kernel
+  Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+  
+  ## make the F kernel
+  Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+  # multiply the continuous kernel by the binwidth (h)
+  #Fkernel.cont <- as.matrix(h * Fkernel.cont)
+  
+  Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+  # multiply the cont_to_disc distribution by the binwidth (h)
+  #Fkernel.discr <- as.matrix(h * Fkernel.discr)
+  Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+  
+  mat <-Pkernel+Fkernel
+  
+  eigenMat <- eigen(mat)
+  # get the lambda and store it
+  allDI_lambdas[i] <- eigenMat$values[1]
+  
+  allDI_params[[i]] <- paramCont_now
+}
+
+### plot the values
+# get the parameters out
+for (i in 1:200) {
+  if (i == 1) {
+    param_fig_DI <- data.frame("param" = "s_int", "value" = allDI_params[[i]][[1]][1,])
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "s_slope", "value" = allDI_params[[i]][[1]][2,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "g_int", "value" = allDI_params[[i]][[2]][1,1]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "g_slope", "value" = allDI_params[[i]][[2]][2,1]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "g_sd", "value" = allDI_params[[i]][[2]][1,2]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "c_o_mu", "value" = allDI_params[[i]][[3]][1,1]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "c_o_sd", "value" = allDI_params[[i]][[3]][1,2]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "p_b_int", "value" = allDI_params[[i]][[4]][1,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "p_b_slope", "value" = allDI_params[[i]][[4]][2,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "p_b_slope_2", "value" = allDI_params[[i]][[4]][3,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "b_int", "value" = allDI_params[[i]][[5]][1,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "b_slope", "value" = allDI_params[[i]][[5]][2,]))
+  } else {
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "s_int", "value" = allDI_params[[i]][[1]][1,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "s_slope", "value" = allDI_params[[i]][[1]][2,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "g_int", "value" = allDI_params[[i]][[2]][1,1]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "g_slope", "value" = allDI_params[[i]][[2]][2,1]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "g_sd", "value" = allDI_params[[i]][[2]][1,2]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "c_o_mu", "value" = allDI_params[[i]][[3]][1,1]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "c_o_sd", "value" = allDI_params[[i]][[3]][1,2]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "p_b_int", "value" = allDI_params[[i]][[4]][1,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "p_b_slope", "value" = allDI_params[[i]][[4]][2,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "p_b_slope_2", "value" = allDI_params[[i]][[4]][3,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "b_int", "value" = allDI_params[[i]][[5]][1,]))
+    param_fig_DI <- rbind(param_fig_DI, data.frame("param" = "b_slope", "value" = allDI_params[[i]][[5]][2,]))
+  }
+}
+
+# calculate the mean values
+test <- param_fig_DI %>% 
+  group_by(param) %>% 
+  summarise("mean_value" = mean(value))
+param_fig <- left_join(param_fig_DI, test)
+# plot the distribution of values
+ggplot(data = param_fig) + 
+  geom_density(mapping = aes(value)) +
+  geom_vline(aes(xintercept = mean_value, col = param)) + 
+  geom_vline(aes(xintercept = 0), col = "grey", lty = 2) +
+  facet_wrap(~ param, scales = "free") +
+  scale_color_discrete(guide = "none") + 
+  theme_classic()
+
+# compare lambdas
+plot(density(as.numeric(allDI_lambdas)))
+abline(v = eigenMat$values[1], col = 'red', lwd = 2, lty = 2)
+abline(v = mean(allDI_lambdas), col = "blue", lwd = 2, lty = 2)
+
+
 #### hand-calculated model for continuous-ized seedlings and discrete seedbank --Density Dependent ####
 
 ### Define the demographic functions and parameters ###
@@ -373,27 +535,205 @@ eigenMat$values[1]
 
 eigenMat$vectors
 
-## 
-## 
-# compare the P and F continuous kernels
-# the continuous part of the P kernel is the same between the ipmr and by-hand models! 
-Pkernel.cont - contSeedlings_IPM$sub_kernels$P
-# the contiuous F kernel and the ipmr F kernela are the same! 
-Fkernel.cont - contSeedlings_IPM$sub_kernels$F
-
-# compare the distributions for disc transitions
-plot(x = meshp, y = contSeedlings_IPM$sub_kernels$seedbank_to_continuous, type = 'l')
-lines(x = meshp, y = mat[2:501,1])
-lines(x = meshp, y = c( outSB*c_o[,1])/h)
-# the same! 
-
-plot(x = meshp, y = contSeedlings_IPM$sub_kernels$continuous_to_seedbank, type = 'l')
-lines(x = meshp, y = Fkernel.discr[2:501])
-lines(x = meshp, y = matrix(c( goSB * h * (FecALL)), nrow = 1))
-# not the same :-( 
-
 library(popbio)
 
 popbio::lambda(mat)
 eigenList <- eigen.analysis(mat)
 
+## calculate the uncertainty using bootstrapping
+# make a vector to hold all of the lambdas from the resampling runs
+allDD_lambdas <- numeric(200L)
+# make a list to hold the model parameters
+paramCont_now <- list()
+allDD_params <- list()
+# set seedbank parameters, which don't change
+outSB <- outSB_all #SB to continuous stage
+staySB <- staySB_all # staying in SB
+goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
+goSB <- goSB_all # seeds go to the seedbank
+surv.seeds <-  0.9 # survival of seeds
+# Now, we refit the vital rate models, and refit the IPM
+for(i in 1:200) {
+  ## sample continuous data
+  sample_ind <- seq(1, nrow(dat_all), by = 1)
+  
+  boot_data_ind   <- sample(sample_ind, size = 6000, replace = TRUE)
+  
+  boot_data <- dat_all[boot_data_ind,]
+  
+  ## fit vital rate models
+  ## Survival ($s(z)$)
+  survDat_now <- boot_data[boot_data$flowering==0 | is.na(boot_data$flowering),]
+  survMod_now <- glm(survives_tplus1 ~ log_LL_t + N_all, data = survDat_now, family = binomial)
+  ## Growth ($G(z',z)$)
+  sizeMod_now <- lm(log_LL_tplus1 ~ log_LL_t + N_all, data = boot_data)
+  ## Number of seeds produced, according to plant size ($b(z)$)
+  seedDat_now <- boot_data[boot_data$flowering==1,]
+  # fit  negative binomial model (for count data)
+  seedMod_now <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_now)
+  ## Flowering probability ($p_b(z)$)
+  flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) + N_all , data = boot_data, family = binomial)))
+  ## Distribution of recruit size ($c_o(z')$)
+  # subset the data
+  recD_now <- boot_data[boot_data$seedling == 1,]
+  # fit the model
+  recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
+  
+  # update the parameter list with parameters from this iteration
+  paramCont_now<- list(
+    g_int     = coef(sizeMod_now)[1], # growth 
+    g_slope   = coef(sizeMod_now)[2],
+    g_dd      = coef(sizeMod_now)[3],
+    g_sd      = summary(sizeMod_now)$sigma,
+    s_int     = coef(survMod_now)[1], # survival
+    s_slope   = coef(survMod_now)[2],
+    s_dd      = coef(survMod_now)[3],
+    p_b_int   = coef(flwrMod_now)[1], #probability of flowering
+    p_b_slope = coef(flwrMod_now)[2],
+    p_b_slope_2 = coef(flwrMod_now)[3],
+    p_b_dd    = coef(flwrMod_now)[4],
+    b_int   = coef(seedMod_now)[1], #seed production
+    b_slope = coef(seedMod_now)[2],
+    c_o_mu    = coef(recMod_now), #recruit size distribution
+    c_o_sd    = summary(recMod_now)$sigma,
+    outSB  = outSB_all,
+    staySB = staySB_all,
+    goSB   = goSB_all, 
+    goCont = goCont_all                  
+  )
+  
+  K <- array(0,c(n+1,n+1))
+  
+  # I recommend you set i = 1, set n low to say 10 
+  
+  # Setting up the kernels
+  b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+  meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+  
+  h=(U-L)/n # bin width 
+  
+  # Survival and growth 
+  S <- diag(S.fun(meshp, N_all = 500)) # Survival # put survival probabilities in the diagonal of the matrix
+  G <- h * t(outer(meshp,meshp,GR.fun, N_all = 500)) # Growth
+  # G <- t(outer(meshp,meshp,GR.fun)) # Growth
+  
+  #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+  c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+  # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+  
+  #Probability of flowering
+  Pb = (FL.fun(meshp, N_all = 500))
+  
+  #Number of seeds produced according to adult size
+  b_seed = (SDP.fun(meshp))
+  
+  FecALL= Pb * b_seed
+  
+  # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+  S_new <- S * (1-Pb)
+  
+  # Control for eviction:
+  # this is equivalent to redistributing evicted sizes evenly among existing size classes 
+  G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  
+  # make the continuous part of the P matrix
+  Pkernel.cont <- as.matrix(G %*% S_new)
+  # multiply the continuous kernel by the binwidth (h)
+  # Pkernel.cont <- h * Pkernel.cont
+  
+  # seedbank (first column of your K)
+  Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+  
+  # Make the full P kernel
+  Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+  
+  ## make the F kernel
+  Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+  # multiply the continuous kernel by the binwidth (h)
+  #Fkernel.cont <- as.matrix(h * Fkernel.cont)
+  
+  Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+  # multiply the cont_to_disc distribution by the binwidth (h)
+  #Fkernel.discr <- as.matrix(h * Fkernel.discr)
+  Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+  
+  mat <-Pkernel+Fkernel
+  
+  eigenMat <- base::eigen(mat)
+  # save the lambda
+  allDD_lambdas[i] <- eigenMat$values[1]
+  # save the parameters
+  allDD_params[[i]] <- paramCont_now
+}
+
+### plot the values
+# get the parameters out
+# Plot the results
+param_fig <- data.frame("param" = "g_int", 
+                        "value" = sapply(X = allDD_params, FUN = function (x) x[[1]]))
+param_fig <- rbind(param_fig,  data.frame("param" = "g_slope", 
+                                          "value" = sapply(X = allDD_params,
+                                                           FUN = function (x) x[[2]])))
+param_fig <- rbind(param_fig,  data.frame("param" = "g_dd", 
+                                          "value" = sapply(X = allDD_params,
+                                                           FUN = function (x) x[[3]])))
+param_fig <- rbind(param_fig, data.frame("param" = "g_sd", 
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[4]])))
+param_fig <- rbind(param_fig, data.frame("param" = "s_int", 
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[5]])))
+param_fig <- rbind(param_fig, data.frame("param" = "s_slope",
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[6]])))
+param_fig <- rbind(param_fig,  data.frame("param" = "s_dd", 
+                                          "value" = sapply(X = allDD_params,
+                                                           FUN = function (x) x[[7]])))
+param_fig <- rbind(param_fig, data.frame("param" = "p_b_int", 
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[8]])))
+param_fig <- rbind(param_fig, data.frame("param" = "p_b_slope", 
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[9]])))
+param_fig <- rbind(param_fig, data.frame("param" = "p_b_slope_2", 
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[10]])))
+param_fig <- rbind(param_fig,  data.frame("param" = "p_b_dd", 
+                                          "value" = sapply(X = allDD_params,
+                                                           FUN = function (x) x[[11]])))
+param_fig <- rbind(param_fig, data.frame("param" = "b_int", 
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[12]])))
+param_fig <- rbind(param_fig, data.frame("param" = "b_slope", 
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[13]])))
+param_fig <- rbind(param_fig, data.frame("param" = "c_o_mu", 
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[14]])))
+param_fig <- rbind(param_fig, data.frame("param" = "c_o_sd", 
+                                         "value" = sapply(X = allDD_params,
+                                                          FUN = function (x) x[[15]])))
+
+# calculate the mean values
+test <- param_fig%>% 
+  group_by(param) %>% 
+  summarise("mean_value" = mean(value))
+param_fig <- left_join(param_fig, test)
+# plot the distribution of values
+ggplot(data = param_fig) + 
+  geom_density(mapping = aes(value)) +
+  geom_vline(aes(xintercept = mean_value, col = param)) + 
+  geom_vline(aes(xintercept = 0), col = "grey", lty = 2) +
+  facet_wrap(~ param, scales = "free") +
+  scale_color_discrete(guide = "none") + 
+  theme_classic()
+
+# compare lambdas
+plot(density(as.numeric(allDD_lambdas)))
+abline(v = eigenMat$values[1], col = 'red', lwd = 2, lty = 2)
+abline(v = mean(allDD_lambdas), col = "blue", lwd = 2, lty = 2)
+
+#### DI IPM for each site ####
+
+#### DD IPM for each site ####
