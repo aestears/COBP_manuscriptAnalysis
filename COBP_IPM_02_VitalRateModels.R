@@ -280,7 +280,111 @@ goSB.est <- viab.rt * (1 - germ.rt)
  # use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
  # viab.rt * germ.rt
  goCont_all <- viab.rt * germ.rt
+
+ #### Models by site (no env. co-variates, CONTINUOUS SEEDLINGS- DI) ####
+ ### Make vital rate models (put inside a for-loop; store models in a list)
+ # make an empty list to hold models
+ det_DI_mods <- list()
+ det_DI_mods[1:6] <- NA
+ # make a vector of site names
+ siteNames <- unique(dat_all$Site)
+ # start for-loop to fit models
+ for (i in 1:length(siteNames)) {
+   # make a list to hold models for this site
+   temp_mod_list <- list()
+   temp_mod_list[1:5] <- NA
+   # get the name of the site
+   site_now <- siteNames[i]
+   
+   ## fit survival model
+   # get data only for plants that didn't flower
+   survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
+                        dat_all$Site == site_now,]
+   # fit model and store in list
+   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t , data = survDat_now, family = binomial)
+   names(temp_mod_list)[1] <- paste0("surv")
+   
+   ## fit growth model
+   # get all data, but just for this site
+   allDat_now <- dat_all[dat_all$Site == site_now,]
+   # fit model and store in a list
+   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t , data = allDat_now)
+   names(temp_mod_list)[2] <- paste0("growth")
+   
+   ## number of seeds produced, according to plant size
+   seedDat_now <- dat_all[dat_all$flowering == 1 & dat_all$Site == site_now,]
+   # fit the model and store it
+   temp_mod_list[[3]] <- glm(Num_seeds ~ log_LL_t , data = seedDat_now, family = poisson)
+   names(temp_mod_list)[3] <- paste0("seedProduction")
+   
+   ## probability of flowering
+   temp_mod_list[[4]] <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = allDat_now, family = binomial)))
+   names(temp_mod_list)[4] <- paste0("flowering")
+   
+   ## distribution of recruit size
+   recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
+                     dat_all$Site == site_now,]
+   temp_mod_list[[5]] <- lm(log_LL_t ~ 1, data = recD_now)
+   names(temp_mod_list)[5] <- paste0("recruitDist")
+   
+   ## store the temporary model list in the appropriate slot of the 'det_DI_mods' list
+   det_DI_mods[[i]] <- temp_mod_list
+   names(det_DI_mods)[i] <- site_now
+ }
+ ## use uniform p.estab, outSB, staySB, and goSB estimates
  
+ #### Models by site (no env covariates, CONTINUOUS SEEDLINGS - DD) ####
+ ### Make vital rate models (put inside a for-loop; store models in a list)
+ # make an empty list to hold models
+ det_DD_mods <- list()
+ det_DD_mods[1:6] <- NA
+ # make a vector of site names
+ siteNames <- unique(dat$Site)
+ # start for-loop to fit models
+ for (i in 1:length(siteNames)) {
+   # make a list to hold models for this site
+   temp_mod_list <- list()
+   temp_mod_list[1:5] <- NA
+   # get the name of the site
+   site_now <- siteNames[i]
+   
+   ## fit survival model
+   # get data only for plants that didn't flower
+   survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
+                        dat_all$Site == site_now,]
+   # fit model and store in list
+   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + N_all_t, data = survDat_now, family = binomial)
+   names(temp_mod_list)[1] <- paste0("surv")
+   
+   ## fit growth model
+   # get all data, but just for this site
+   allDat_now <- dat_all[dat_all$Site == site_now,]
+   # fit model and store in a list
+   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + N_all_t, data = allDat_now)
+   names(temp_mod_list)[2] <- paste0("growth")
+   
+   ## number of seeds produced, according to plant size
+   seedDat_now <- dat_all[dat_all$flowering == 1 & dat_all$Site == site_now,]
+   # fit the model and store it
+   temp_mod_list[[3]] <- glm(Num_seeds ~ log_LL_t , data = seedDat_now, family = poisson)
+   names(temp_mod_list)[3] <- paste0("seedProduction")
+   
+   ## probability of flowering
+   temp_mod_list[[4]] <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = allDat_now, family = binomial)))
+   names(temp_mod_list)[4] <- paste0("flowering")
+   
+   ## distribution of recruit size
+   recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
+                     dat_all$Site == site_now,]
+   temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + N_all_t, data = recD_now)
+   names(temp_mod_list)[5] <- paste0("recruitDist")
+   
+   ## store the temporary model list in the appropriate slot of the 'det_DI_mods' list
+   det_DD_mods[[i]] <- temp_mod_list
+   names(det_DD_mods)[i] <- site_now
+ }
+ 
+ # 
 #### Vital Rate Models for deterministic, density-independent IPM with FIRST HALF OF DATA ####
 ## subset data for years 2018-2019
 dat_first <- dat[dat$Year %in% c(2018),]
@@ -552,7 +656,6 @@ for (i in 1:length(siteNames)) {
   }
 ## use uniform p.estab, outSB, staySB, and goSB estimates
 
-#%%%AES%%% make a 
 #### Models by site (deterministic, no env covariates, DD) ####
 ### Make vital rate models (put inside a for-loop; store models in a list)
 # make an empty list to hold models

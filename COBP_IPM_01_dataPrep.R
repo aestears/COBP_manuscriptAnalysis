@@ -201,7 +201,9 @@ germ.rt.ours <- .03
 germ.rt.Burgess <- mean(c(13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
 
 # germination rate from the Burgess paper incorporates both viability and germination. To isolate just the germination rate, divide the Burgess germination rate by the viability rate
-germ.rt <-germ.rt.Burgess/total_seed_viab.rt  
+germ.rt_temp <-germ.rt.Burgess/total_seed_viab.rt  
+# because the Burgess germ.rate was estimated in a greenhouse, and we are confident that field rates are lower, multiply teh Burgess germ.rate by .80
+germ.rt <- germ.rt_temp * .8
 
 # the viability rate (proportion of seeds produced by an adult plant that are viable) is the 'total_seed_viab.rt' derived from the Burgess paper results
 viab.rt <- total_seed_viab.rt
