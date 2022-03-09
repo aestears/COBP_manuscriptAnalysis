@@ -10,7 +10,9 @@ library(tidyverse)
 
 #### Load Data ####
 ## load continuous data
-dat <- read.csv("../Processed_Data/COBP_long_CURRENT.csv")
+dat <- read.csv("../Processed_Data/COBP_long_CURRENT.csv") %>% 
+  dplyr::select(-Quadrant.x) %>% 
+  mutate(Quadrant = Quadrant.y)
 
 ## get seedling data
 seedlings <- read.csv("../Raw Data/COBP_seedlings_8_23_21.csv") %>% 
@@ -121,9 +123,15 @@ for (i in 1:length(quads)) {
   }
   }
   
+## add the 2020 seedlings into the data (don't have survival, since we can't know whether they survive or not)
+seedlings_2020 <- seedlings_long[seedlings_long$Year==2020,]
+## add to the 'seedlings_cont' df
+seedlings_cont <- rbind(seedlings_cont, seedlings_2020)
 
 ## "seedlings_cont" contains the continuous seedling data
 # there are only values for 2018 and 2019, since we can't know whether seedlings from 2020 survived or not
+# make sure both dfs have the same column order
+dat <- dat[,names(seedlings_cont)]
 # add seedlings_cont to the dat dataframe
 dat_all <- rbind(dat, seedlings_cont)
 
@@ -360,7 +368,26 @@ N_all <- dat_all %>%
   summarize(N_all = n())
 # add to the dat_all d.f
 dat_all <- dat_all %>% left_join(N_all)
+# make sure log(longest leaf) is calculated for all plants
+dat_all$log_LL_t <- log(dat_all$LongestLeaf_cm)
+# make sure pop size values are correct
+N_all_dat <- dat_all %>% group_by(Site, Plot_ID, Year) %>% 
+  summarize(N_all_t = n())
+N_adultSeedling_dat <- dat_all %>% group_by(Site, Plot_ID, Year, seedling) %>% 
+  summarize(N = n()) %>% 
+  pivot_wider(id_cols = c(Plot_ID, Year), names_from = seedling, values_from = N) %>% 
+  rename(N_adults_t = `0`, N_seedlings_t = `1`)
 
+N_dat <- left_join(N_all_dat, N_adultSeedling_dat)
+## get site-level N 
+N_site <- dat_all %>% group_by(Site, Year) %>% 
+  summarize(N_Site_t = n())
+N_dat <- left_join(N_dat, N_site)
+
+## add pop. size data to 'dat_all' df
+dat_all <- dat_all %>% 
+  dplyr::select(-c(N_seedlings_t, N_adults_t, N_all_t)) %>% 
+  left_join(N_dat)
 # # write the discreteDat d.f to file
 #write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
 # # also write the continuous seedling d.f to file

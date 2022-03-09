@@ -14,6 +14,8 @@ source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
 #### Vital Rate Models for Deterministic, non-density-dependent IPM with all data ####
 ## get the data just for 'adult' plants
 dat <- dat_all[dat_all$seedling !=1,]
+dat_all <- dat_all %>% 
+  rename(N_all = N_all_t)
 
 ### Make vital rate models 
 ## Survival ($s(z)$)
@@ -353,14 +355,14 @@ goSB.est <- viab.rt * (1 - germ.rt)
    survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
                         dat_all$Site == site_now,]
    # fit model and store in list
-   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + N_all_t, data = survDat_now, family = binomial)
+   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + N_Site_t, data = survDat_now, family = binomial)
    names(temp_mod_list)[1] <- paste0("surv")
    
    ## fit growth model
    # get all data, but just for this site
    allDat_now <- dat_all[dat_all$Site == site_now,]
    # fit model and store in a list
-   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + N_all_t, data = allDat_now)
+   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + N_Site_t, data = allDat_now)
    names(temp_mod_list)[2] <- paste0("growth")
    
    ## number of seeds produced, according to plant size
@@ -376,7 +378,7 @@ goSB.est <- viab.rt * (1 - germ.rt)
    ## distribution of recruit size
    recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
                      dat_all$Site == site_now,]
-   temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + N_all_t, data = recD_now)
+   temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + N_Site_t, data = recD_now)
    names(temp_mod_list)[5] <- paste0("recruitDist")
    
    ## store the temporary model list in the appropriate slot of the 'det_DI_mods' list
@@ -385,9 +387,9 @@ goSB.est <- viab.rt * (1 - germ.rt)
  }
  
  # 
-#### Vital Rate Models for deterministic, density-independent IPM with FIRST HALF OF DATA ####
+#### Vital Rate Models for deterministic, density-independent IPM with FIRST HALF OF DATA #### (w/ continuous seedling data)
 ## subset data for years 2018-2019
-dat_first <- dat[dat$Year %in% c(2018),]
+dat_first <- dat_all[dat_all$Year %in% c(2018),]
 
 # subset the data to exclude flowering individuals
 survDat_first <- dat_first[dat_first$flowering==0 | is.na(dat_first$flowering),]
@@ -411,13 +413,13 @@ flwrMod_first <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , da
 
 ## Distribution of recruit size ($c_o(z')$)
 # subset the data
-recD_first <- dat[dat$age == 0 & is.na(dat$age) == FALSE & dat$Year == 2019,]
+recD_first <- dat_all[dat_all$seedling == 1  & dat_all$Year == 2019,]
 # fit the model
 recMod_first <- lm(log_LL_t ~ 1, data = recD_first)
 
 #### Vital Rate Models for deterministic, density-independent IPM with SECOND HALF OF DATA ####
 ## subset data for years 2018-2019
-dat_second <- dat[dat$Year %in% c(2018),]
+dat_second <- dat_all[dat_all$Year %in% c(2019),]
 
 # subset the data to exclude flowering individuals
 survDat_second <- dat_second[dat_second$flowering==0 | is.na(dat_second$flowering),]
@@ -441,9 +443,10 @@ flwrMod_second <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , d
 
 ## Distribution of recruit size ($c_o(z')$)
 # subset the data
-recD_second <- dat[dat$age == 0 & is.na(dat$age) == FALSE & dat$Year == 2020,]
+recD_second <- dat_all[dat_all$seedling == 1 & dat_all$Year == 2020,]
 # fit the model
 recMod_second <- lm(log_LL_t ~ 1, data = recD_second)
+
 #### Vital Rate Models for Deterministic, density-dependent IPM with all data####
 ### Make vital rate models 
 ## Survival ($s(z)$)
