@@ -69,24 +69,24 @@ paramCont[[5]]=as.matrix(coef(seedMod_all))
 # name the paramCont list to keep track of coefficients
 names(paramCont) <- c("survival", "growth", "recruitDist", "flowering", "seedProduction")
 #vital rate functions
-S.fun <- function(z) {
+S.fun <- function(z, paramCont) {
   mu.surv=paramCont[["survival"]]["(Intercept)",] + paramCont[["survival"]]["log_LL_t",]*z
   return(1/(1 + exp(-(mu.surv))))
 }
-GR.fun <- function(z,zz){
+GR.fun <- function(z,zz, paramCont){
   growth.mu = paramCont[["growth"]]["(Intercept)",1] + paramCont[["growth"]]["log_LL_t",1]*z
   return(dnorm(zz, mean = growth.mu, sd = paramCont[["growth"]][1,2]))
 }
-SDS.fun <- function(zz){
+SDS.fun <- function(zz, paramCont){
   rec_mu <- paramCont[["recruitDist"]][1]
   rec_sd <- paramCont[["recruitDist"]][2]
   return(dnorm(zz, mean = rec_mu, sd = rec_sd))
 }
-FL.fun <- function(z) {
+FL.fun <- function(z, paramCont) {
   mu.fl = paramCont[["flowering"]][1,] + paramCont[["flowering"]][2,]*z +  paramCont[["flowering"]][3,]* (z^2)
   return(1/(1+ exp(-(mu.fl))))
 }
-SDP.fun <- function(z) {
+SDP.fun <- function(z, paramCont) {
   mu.fps=exp(paramCont[["seedProduction"]][1,1] + paramCont[["seedProduction"]][2,1]*z)
   return(mu.fps)
 }
@@ -121,15 +121,15 @@ for (i in 1:length(par_names)) {
       meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
       h=(U-L)/n # bin width 
       # Survival and growth 
-      S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal of the matrix
-      G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
+      S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+      G <- h * t(outer(meshp,meshp,GR.fun, paramCont = paramCont)) # Growth
       #Recruits distribution 
-      c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+      c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
       # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
       #Probability of flowering
-      Pb = (FL.fun(meshp))
+      Pb = (FL.fun(meshp, paramCont))
       #Number of seeds produced according to adult size
-      b_seed = (SDP.fun(meshp))
+      b_seed = (SDP.fun(meshp, paramCont))
       FecALL= Pb * b_seed
       # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
       S_new <- S * (1-Pb)
@@ -292,7 +292,6 @@ for (i in 1:length(par_names)) {
     }
   }
 }
-
 # calculate the sensitivity for each value
 disc_perturbs$sens <- (disc_perturbs$lambda - as.numeric((lam_allDI)))/(disc_perturbs$param_newVal - disc_perturbs$param_OGval)
 # calculate elasticities
@@ -304,6 +303,189 @@ mean_disc_perturbs <- disc_perturbs %>%
   group_by(param_name) %>% 
   summarize(param_OGval = mean(param_OGval, na.rm = TRUE), sens_mean = mean(sens, na.rm = TRUE), elas_mean = mean(elas, na.rm = TRUE))
 
+## get elasticity/sensitivity for other vital rate parameters (model parameters in vital rate models)
+# previous SB vital rates
+germ.rt <-  0.1629526
+viab.rt <- 0.5852778
+surv.seeds <-  0.9 
+# 'actual' parameters are in the 'paramCont' list
+
+# make a vector that contains the proportions by which the parameter will be changed
+perc_changes <- seq(0.1,2, by = .1)
+
+model_perturbs <-  data.frame( "param_name" = as.character(NA), 
+                          "param_OGval" = NA,
+                          "param_newVal" = NA, 
+                          "lambda" = NA)
+# loop through each of the vital rate processes
+for (i in 1:length(names(paramCont))) {
+  # get the name of the vital rate
+  modelName <- names(paramCont)[i]
+  if (ncol(paramCont[[modelName]]) == 1){
+    for (j in 1: nrow(paramCont[[modelName]])) {
+      for (k in 1:length(perc_changes)) {
+        paramNow <- paramCont
+        # replace the value in the parameter list
+        paramNow[[modelName]][j,] <- paramCont[[modelName]][j]*perc_changes[k]
+        # make the IPM
+        K <- array(0,c(n+1,n+1))
+        b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+        meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+        h=(U-L)/n # bin width 
+        # Survival and growth 
+        S <- diag(S.fun(meshp, paramNow)) # Survival # put survival probabilities in the diagonal of the matrix
+        G <- h * t(outer(meshp,meshp,GR.fun, paramNow)) # Growth
+        #Recruits distribution 
+        c_o <- h * matrix(rep(SDS.fun(meshp, paramNow),n),n,n,byrow=F)
+        # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+        #Probability of flowering
+        Pb = (FL.fun(meshp, paramNow))
+        #Number of seeds produced according to adult size
+        b_seed = (SDP.fun(meshp, paramNow))
+        FecALL= Pb * b_seed
+        # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+        S_new <- S * (1-Pb)
+        # Control for eviction:
+        G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+        c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+        # make the continuous part of the P matrix
+        Pkernel.cont <- as.matrix(G %*% S_new)
+        # seedbank (first column of your K)
+        Pkernel.seedbank = c(staySB_all, outSB_all*c_o[,1]) # seeds survive and go to continuous
+        # Make the full P kernel
+        Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+        ## make the F kernel
+        Fkernel.cont <-  as.matrix(goCont_all * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+        Fkernel.discr  <- matrix(c(0, goSB_all * (FecALL)), nrow = 1)
+        Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+        # calculate the entire matrix
+        mat_now <-Pkernel+Fkernel
+        # calculate lambda
+        lambda_now <- Re(eigen(mat_now)$values[1])
+        # store the data
+        model_perturbs <- rbind(model_perturbs, 
+                                data.frame(
+                                  "param_name" = paste0(modelName,"_", names(paramNow[[modelName]][j,])), 
+                                  "param_OGval" = paramCont[[modelName]][j],
+                                  "param_newVal" = paramNow[[modelName]][j,], 
+                                  "lambda" = as.numeric(lambda_now)))
+      }
+    }
+  } else if (ncol(paramCont[[modelName]]) > 1) {
+    for (j in 1: nrow(paramCont[[modelName]])) {
+      for (k in 1:length(perc_changes)) {
+        paramNow <- paramCont
+        # replace the value in the parameter list
+        paramNow[[modelName]][j,1] <- paramCont[[modelName]][j]*perc_changes[k]
+        # make the IPM
+        K <- array(0,c(n+1,n+1))
+        b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+        meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+        h=(U-L)/n # bin width 
+        # Survival and growth 
+        S <- diag(S.fun(meshp, paramNow)) # Survival # put survival probabilities in the diagonal of the matrix
+        G <- h * t(outer(meshp,meshp,GR.fun, paramNow)) # Growth
+        #Recruits distribution 
+        c_o <- h * matrix(rep(SDS.fun(meshp, paramNow),n),n,n,byrow=F)
+        # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+        #Probability of flowering
+        Pb = (FL.fun(meshp, paramNow))
+        #Number of seeds produced according to adult size
+        b_seed = (SDP.fun(meshp, paramNow))
+        FecALL= Pb * b_seed
+        # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+        S_new <- S * (1-Pb)
+        # Control for eviction:
+        G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+        c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+        # make the continuous part of the P matrix
+        Pkernel.cont <- as.matrix(G %*% S_new)
+        # seedbank (first column of your K)
+        Pkernel.seedbank = c(staySB_all, outSB_all*c_o[,1]) # seeds survive and go to continuous
+        # Make the full P kernel
+        Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+        ## make the F kernel
+        Fkernel.cont <-  as.matrix(goCont_all * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+        Fkernel.discr  <- matrix(c(0, goSB_all * (FecALL)), nrow = 1)
+        Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+        # calculate the entire matrix
+        mat_now <-Pkernel+Fkernel
+        mat_now[which(is.nan(mat_now))] <- NA
+        # calculate lambda
+        lambda_now <- Re(eigen(mat_now)$values[1])
+        # store the data
+        model_perturbs <- rbind(model_perturbs, 
+                                data.frame(
+                                  "param_name" = paste0(modelName,"_", names(paramNow[[modelName]][j,1])), 
+                                  "param_OGval" = paramCont[[modelName]][j],
+                                  "param_newVal" = paramNow[[modelName]][j,], 
+                                  "lambda" = as.numeric(lambda_now)))
+      }
+    }
+    for (l in 2:ncol(paramCont[[modelName]])) {
+      for (k in 1:length(perc_changes)) {
+      paramNow <- paramCont
+      # replace the value in the parameter list
+      paramNow[[modelName]][1,l] <- paramCont[[modelName]][1,l]*perc_changes[k]
+      # make the IPM
+      K <- array(0,c(n+1,n+1))
+      b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+      meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+      h=(U-L)/n # bin width 
+      # Survival and growth 
+      S <- diag(S.fun(meshp, paramNow)) # Survival # put survival probabilities in the diagonal of the matrix
+      G <- h * t(outer(meshp,meshp,GR.fun, paramNow)) # Growth
+      #Recruits distribution 
+      c_o <- h * matrix(rep(SDS.fun(meshp, paramNow),n),n,n,byrow=F)
+      # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+      #Probability of flowering
+      Pb = (FL.fun(meshp, paramNow))
+      #Number of seeds produced according to adult size
+      b_seed = (SDP.fun(meshp, paramNow))
+      FecALL= Pb * b_seed
+      # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+      S_new <- S * (1-Pb)
+      # Control for eviction:
+      G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+      c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+      # make the continuous part of the P matrix
+      Pkernel.cont <- as.matrix(G %*% S_new)
+      # seedbank (first column of your K)
+      Pkernel.seedbank = c(staySB_all, outSB_all*c_o[,1]) # seeds survive and go to continuous
+      # Make the full P kernel
+      Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+      ## make the F kernel
+      Fkernel.cont <-  as.matrix(goCont_all * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+      Fkernel.discr  <- matrix(c(0, goSB_all * (FecALL)), nrow = 1)
+      Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+      # calculate the entire matrix
+      mat_now <-Pkernel+Fkernel
+      mat_now[which(is.nan(mat_now))] <- NA
+      # calculate lambda
+      lambda_now <- Re(eigen(mat_now)$values[1])
+      # store the data
+      model_perturbs <- rbind(model_perturbs, 
+                              data.frame(
+                                "param_name" = paste0(modelName,"_stndDev"), 
+                                "param_OGval" = paramCont[[modelName]][1,l],
+                                "param_newVal" = paramNow[[modelName]][1,l], 
+                                "lambda" = as.numeric(lambda_now)))
+      }
+    }
+  }
+}
+# calculate the sensitivity for each value
+model_perturbs$sens <- (model_perturbs$lambda - as.numeric((lam_allDI)))/(model_perturbs$param_newVal - model_perturbs$param_OGval)
+# calculate elasticities
+model_perturbs$elas <- (model_perturbs$param_OGval/as.numeric(lam_allDI)) * model_perturbs$sens
+# remove the 'inf' values, which result from having a difference of '0' between new and old values
+model_perturbs[is.infinite(model_perturbs$sens),c("sens", "elas")] <- NA
+# average values for each parameter
+mean_model_perturbs <- model_perturbs %>% 
+  group_by(param_name) %>% 
+  summarize(param_OGval = mean(param_OGval, na.rm = TRUE), sens_mean = mean(sens, na.rm = TRUE), elas_mean = mean(elas, na.rm = TRUE))
+
+#%%%AES%%% double check how sensitivity and elasticity are calculated...
 #### DD all dat IPM ####
 ## called 'mat_all_DD' 
 # calculate lambda

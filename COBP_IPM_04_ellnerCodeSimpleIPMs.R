@@ -15,22 +15,16 @@ source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
 
 # Empty list to save model coefficients 
 paramCont=list(NULL)
-
 # survival model is called 'survMod_all'
 paramCont[[1]]=as.matrix(coef(survMod_all)) # save coefficients 
-
 # growth model is called 'sizeMod_all'
 paramCont[[2]]=cbind(as.matrix(coef(sizeMod_all)),sd(residuals(sizeMod_all))) # the third column is for the standard deviation of growth 
-
 # seedling size distribution is a uniform distribution (of exp(size_2)) with a min of 0.1 and a max 0f 3
 paramCont[[3]]= cbind(as.matrix(coef(recMod_all)), sd(residuals(recMod_all)))
-
 # model for probability of flowering is flwrMod_all
 paramCont[[4]]=as.matrix(coef(flwrMod_all))
-
 # model for seed production per plant (if reproductive) is seedMod_all
 paramCont[[5]]=as.matrix(coef(seedMod_all))
-
 # name the paramCont list to keep track of coefficients
 names(paramCont) <- c("survival", "growth", "recruitDist", "flowering", "seedProduction")
 
