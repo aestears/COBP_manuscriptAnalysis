@@ -28,9 +28,7 @@ dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
                                         to = max(survDat_all$log_LL_t, na.rm = TRUE),
                                         length.out = 100))
  lines(x = newdata$log_LL_t, y = predict(object = survMod_all, newdata =  newdata, type = "response"), col = "red")
- raw_y <- predict(object = survMod_all, newdata =  newdata, type = "link")
- lines(x = newdata$log_LL_t, y = (1/(1 + exp(-(raw_y)))))
-
+ 
  ## Growth ($G(z',z)$)
  # lm w/ log-transformed size_t and size_t+1
  sizeMod_all <- lm(log_LL_tplus1 ~ log_LL_t , data = dat_all)
@@ -708,3 +706,39 @@ for (i in 1:length(siteNames)) {
   names(stoch_DD_mods)[i] <- site_now
 }
 ## use uniform p.estab, outSB, staySB, and goSB estimates 
+
+##### modeling pop.size in t+1 as a function of size in year t ####
+# use the 'N_dat' data.frame
+# add a column for N_site_tplus1
+N_dat$N_Site_tplus1 <- NA
+for(i in unique(N_dat$Plot_ID)) {
+  N_dat[N_dat$Plot_ID == i,"N_Site_tplus1"] <-  c(N_dat[N_dat$Plot_ID == i,]$N_Site_t[2:3], NA)
+}
+
+## use a Poisson model
+dd_mod <- glm(N_Site_tplus1 ~ N_Site_t, dat = N_dat, family = "poisson")
+# check for overdisperson
+3710.2/34 # 109.123 -- yikes, super overdispersed
+## use a negative binomial instead
+dd_nb.mod <- MASS::glm.nb(N_Site_tplus1 ~ N_Site_t, dat = N_dat)
+plot(x = N_dat$N_Site_t, y = N_dat$N_Site_tplus1)
+newdata <- data.frame("N_Site_t" = seq(from = min(N_dat$N_Site_t, na.rm = TRUE), 
+                                       to = max(N_dat$N_Site_t, na.rm = TRUE),
+                                       length.out = 100))
+lines(x = newdata$N_Site_t, y = predict(object = dd_nb.mod, newdata =  newdata, type = "response"), col = "red")
+
+census <- read.csv("/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/Raw Data/fewafb_SiteCensus_2021.csv", header = TRUE)
+names(census) <- c("Site", 2002:2021)
+census <- census %>% 
+  pivot_longer(cols = names(census)[2:21], names_to = "Year", values_to = "N_t")
+census$N_tplus1 <- NA
+for(i in unique(census$Site)) {
+  census[census$Site == i,"N_tplus1"] <-  c(census[census$Site == i,]$N_t[2:20], NA)
+}
+ddCensus_nb.mod <- MASS::glm.nb(N_tplus1 ~ N_t + Site, dat = census)
+plot(x = census$N_t, y = census$N_tplus1)
+newdata <- data.frame("N_t" = seq(from = min(census$N_t, na.rm = TRUE), 
+                                       to = max(census$N_t, na.rm = TRUE),
+                                       length.out = 100),
+                      "Site" = "Diamond")
+lines(x = newdata$N_t, y = predict(object = ddCensus_nb.mod, newdata =  newdata, type = "response"), col = "red")

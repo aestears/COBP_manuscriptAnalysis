@@ -311,7 +311,7 @@ surv.seeds <-  0.9
 # 'actual' parameters are in the 'paramCont' list
 
 # make a vector that contains the proportions by which the parameter will be changed
-perc_changes <- seq(0.1,2, by = .1)
+perc_changes <- seq(0.1,2, by = .05)
 
 model_perturbs <-  data.frame( "param_name" = as.character(NA), 
                           "param_OGval" = NA,
