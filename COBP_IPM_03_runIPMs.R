@@ -409,6 +409,128 @@ plot(x = meshpts, y = preds, ylab = "Survival Probability", type = "l")
 # plot the survival values from the P matrix (column sums)
 points(meshpts,apply(contSeedlings_IPM$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
 
+#### Determinsitic, DI IPM for Soapstone data ####
+#### Deterministic, density-independent IPM with CONTINOUS SEEDLINGS ####
+data_list <- list(
+  g_int     = coef(sizeMod_soap)[1], # growth 
+  g_slope   = coef(sizeMod_soap)[2],
+  g_sd      = sd(residuals(sizeMod_soap)),
+  s_int     = coef(survMod_soap)[1], # survival
+  s_slope   = coef(survMod_soap)[2],
+  p_b_int   = coef(flwrMod_soap)[1], #probability of flowering
+  p_b_slope = coef(flwrMod_soap)[2],
+  p_b_slope_2 = coef(flwrMod_soap)[3],
+  b_int   = coef(seedMod_soap)[1], #seed production
+  b_slope = coef(seedMod_soap)[2],
+  c_o_mu    = coef(recMod_soap), #recruit size distribution
+  c_o_sd    = sd(residuals(recMod_soap)), 
+  outSB  = outSB_all,
+  staySB = staySB_all,
+  goSB   = goSB_all, 
+  goCont = goCont_all                  
+)
+
+# inital population state
+init_size_state <- runif(500)
+
+soapstone_IPM <- init_ipm(sim_gen   = "general", 
+                              di_dd     = "di", 
+                              det_stoch = "det") %>% 
+  define_kernel(
+    name          = "P",
+    formula       =(1-p_b.) * s. * g. * d_size,
+    
+    s.            = 1/(1 + exp(-(s_int + s_slope * size_1))),
+    g.            = dnorm(size_2, g_mu., g_sd), 
+    g_mu.         = g_int + g_slope * size_1, 
+    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+    
+    family        = "CC",
+    data_list     = data_list,
+    states        = list(c('size')),
+    uses_par_sets = FALSE,
+    evict_cor     = TRUE,
+    evict_fun     = truncated_distributions("norm", "g.")
+  ) %>% 
+  define_kernel(
+    name          = "F", 
+    formula       = goCont. * (p_b. * b. * c_o. * d_size),
+    
+    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+    b.            = exp(b_int + b_slope * size_1),
+    c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+    goCont.       = goCont,
+    
+    family        = "CC",
+    data_list     = data_list,
+    states        = list(c('size')),
+    uses_par_sets = FALSE,
+    evict_cor     = TRUE,
+    evict_fun     = truncated_distributions("norm", "c_o.")
+  ) %>% define_kernel(
+    name          = "seedbank_to_continuous", 
+    formula       = outSB. * c_o. ,
+    
+    c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+    outSB.       = outSB,
+    
+    family        = "DC",
+    data_list     = data_list,
+    states        = list(c('size')),
+    uses_par_sets = FALSE,
+    evict_cor     = TRUE,
+    evict_fun     = truncated_distributions("norm", "c_o.")
+  ) %>% define_kernel(
+    name          = "seedbank_to_seedbank", 
+    formula       = staySB.,
+    
+    staySB.       = staySB,
+    
+    family        = "DD",
+    data_list     = data_list,
+    states        = list(c('b')),
+    uses_par_sets = FALSE,
+    evict_cor     = FALSE
+  )   %>% define_kernel(
+    name          = "continuous_to_seedbank", 
+    formula       = goSB.  * (p_b. * b. * d_size),
+    
+    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+    b.            = exp(b_int + b_slope * size_1),
+    goSB.       = goSB,
+    
+    family        = "CD",
+    data_list     = data_list,
+    states        = list(c('size', 'b')),
+    uses_par_sets = FALSE,
+    evict_cor     = FALSE
+  )  %>%
+  define_impl(
+    make_impl_args_list(
+      kernel_names = c("P", "F", "seedbank_to_continuous", "seedbank_to_seedbank", "continuous_to_seedbank"), 
+      int_rule = rep("midpoint", 5),
+      state_start = c("size", "size", "b", "b", "size"), 
+      state_end = c("size", "size", "size", "b", "b")
+    )
+  ) %>% 
+  define_domains(
+    size = c(
+      min(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # lower bound (L)
+      max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
+      500 # number of mesh points
+    )
+  ) %>% 
+  define_pop_state(
+    n_size = runif(500),
+    n_b = 400, 
+    
+  ) %>% 
+  make_ipm(
+    normalize_pop_size = FALSE
+    #iterations = 100
+  )
+
+ipmr::lambda(soapstone_IPM)
 #### Deterministic, density-independent IPM for all data ####
 # vital-rate model names: survMod, sizeMod, seedMod_t, flwrMod_t, recMod, p.estab.est, outSB.est, staySB.est, goSB.est, goSdlng.est 
 

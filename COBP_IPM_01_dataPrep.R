@@ -388,6 +388,12 @@ N_dat <- left_join(N_dat, N_site)
 dat_all <- dat_all %>% 
   dplyr::select(-c(N_seedlings_t, N_adults_t, N_all_t)) %>% 
   left_join(N_dat)
+
+## make sure that the "location" data in dat_all is correct
+dat_all[dat_all$Site %in% c("Crow_Creek", "Diamond_Creek", "Unnamed_Creek"),"Location"] <- "FEWAFB"
+
+dat_all[dat_all$Site %in% c("HQ5", "HQ3", "Meadow"),"Location"] <- "Soapstone"
+
 # # write the discreteDat d.f to file
 #write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
 # # also write the continuous seedling d.f to file
