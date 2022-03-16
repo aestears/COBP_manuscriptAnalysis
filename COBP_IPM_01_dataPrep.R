@@ -10,9 +10,7 @@ library(tidyverse)
 
 #### Load Data ####
 ## load continuous data
-dat <- read.csv("../Processed_Data/COBP_long_CURRENT.csv") %>% 
-  dplyr::select(-Quadrant.x) %>% 
-  mutate(Quadrant = Quadrant.y)
+dat <- read.csv("../Processed_Data/COBP_long_CURRENT.csv") 
 
 ## get seedling data
 seedlings <- read.csv("../Raw Data/COBP_seedlings_8_23_21.csv") %>% 
@@ -131,9 +129,14 @@ seedlings_cont <- rbind(seedlings_cont, seedlings_2020)
 ## "seedlings_cont" contains the continuous seedling data
 # there are only values for 2018 and 2019, since we can't know whether seedlings from 2020 survived or not
 # make sure both dfs have the same column order
-dat <- dat[,names(seedlings_cont)]
+dat <- dat[,names(seedlings_cont[,1:25])]
 # add seedlings_cont to the dat dataframe
-dat_all <- rbind(dat, seedlings_cont)
+dat_all <- rbind(dat, seedlings_cont[,1:25])
+
+## make sure that the "location" data in dat_all is correct
+dat_all[dat_all$Site %in% c("Crow_Creek", "Diamond_Creek", "Unnamed_Creek"),"Location"] <- "FEWAFB"
+
+dat_all[dat_all$Site %in% c("HQ5", "HQ3", "Meadow"),"Location"] <- "Soapstone"
 
 ## get the environmental data
 source("./data_prep_scripts/prepping_Envi_Data.R")
@@ -362,7 +365,7 @@ for (i in 1:length(plots)) {
 # put in a 'discrete' stage d.f
 discDat <- seeds.out
 
-## calculate the total population size for each quad/year combo
+####calculate the total population size for each quad/year combo ####
 N_all <- dat_all %>% 
   group_by(Plot_ID, Year) %>% 
   summarize(N_all = n())
@@ -385,14 +388,8 @@ N_site <- dat_all %>% group_by(Site, Year) %>%
 N_dat <- left_join(N_dat, N_site)
 
 ## add pop. size data to 'dat_all' df
-dat_all <- dat_all %>% 
-  dplyr::select(-c(N_seedlings_t, N_adults_t, N_all_t)) %>% 
+dat_all <- dat_all  %>% 
   left_join(N_dat)
-
-## make sure that the "location" data in dat_all is correct
-dat_all[dat_all$Site %in% c("Crow_Creek", "Diamond_Creek", "Unnamed_Creek"),"Location"] <- "FEWAFB"
-
-dat_all[dat_all$Site %in% c("HQ5", "HQ3", "Meadow"),"Location"] <- "Soapstone"
 
 # # write the discreteDat d.f to file
 #write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)

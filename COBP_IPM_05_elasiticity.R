@@ -23,7 +23,7 @@ h = meshpts[2] - meshpts[1]
 #### DI all dat IPM ####
 ## called 'mat_all_DI' 
 # calculate lambda
-(lam_allDI <- Re(eigen(mat_all_DI)$values[1])) # 1.879
+(lam_allDI <- Re(eigen(mat_all_DI)$values[1])) # 1.48
 
 ## calculate the stable size distribution
 w.eigen_temp <-  Re(eigen(mat_all_DI)$vectors[,1]) 
@@ -43,10 +43,30 @@ elas_allDI <- matrix(as.vector(sens_allDI)*as.vector(mat_all_DI)/lam_allDI,nrow=
 # plot the sensitivity function of the entire continuous kernel
 image(x = meshpts, y = meshpts, t(sens_allDI[2:501,2:501])^.1, 
       xlab = "ln(leaf) in year t", ylab = "ln(leaf) in year t+1")
-contour(x = meshpts, y = meshpts, t(sens_det.di), add = TRUE)
+contour(x = meshpts, y = meshpts, t(sens_allDI[2:501,2:501]), add = TRUE)
 # plot the elasticity function of the entire continuous kernel
 image(x = meshpts, y = meshpts, t(elas_allDI[2:501,2:501])^.1, xlab = "ln(leaf) in year t", ylab = "ln(leaf) in year t+1")
 contour(x = meshpts, y = meshpts, t(elas_allDI[2:501,2:501]), add = TRUE)
+
+# make matrices using ipmr data to double-check
+## calculate the stable size distribution
+w.eigen_test <-  right_ev(contSeedlings_IPM)
+w.eigen_test <- c(w.eigen_test$b_w,w.eigen_test$size_w)
+stable.dist_test <- w.eigen_test/sum(w.eigen_test) 
+
+## calculate the reproductive value distribution
+v.eigen_test <- left_ev(contSeedlings_IPM)
+v.eigen_test <- c(v.eigen_test$b_v, v.eigen_test$size_v)
+repro.val_test <- v.eigen_test/v.eigen_test[1]
+
+## make elas and sens matrices
+v.dot.w_test <- sum(stable.dist_test * repro.val_test)*h
+# calculate the sensitivity function (whole kernel)
+sens_test <- outer(repro.val_test,stable.dist_test, '*')/(v.dot.w_test)
+# calculate the elasticity function (whole kernel)
+elas_test <- matrix(as.vector(sens_test)*as.vector(mat_all_DI)/lambda(contSeedlings_IPM),nrow=501)
+## use these instead...
+
 
 ## calculate sensitivity and elasticity of individual vital rates
 ## loop through w/ new parameters to update the ipm
@@ -183,15 +203,15 @@ for (i in 1:length(par_names)) {
       meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
       h=(U-L)/n # bin width 
       # Survival and growth 
-      S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal of the matrix
-      G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
+      S <- diag(S.fun(meshp, paramCont = paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+      G <- h * t(outer(meshp,meshp,GR.fun, paramCont = paramCont)) # Growth
       #Recruits distribution 
-      c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+      c_o <- h * matrix(rep(SDS.fun(meshp, paramCont = paramCont),n),n,n,byrow=F)
       # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
       #Probability of flowering
-      Pb = (FL.fun(meshp))
+      Pb = (FL.fun(meshp, paramCont = paramCont))
       #Number of seeds produced according to adult size
-      b_seed = (SDP.fun(meshp))
+      b_seed = (SDP.fun(meshp, paramCont = paramCont))
       FecALL= Pb * b_seed
       # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
       S_new <- S * (1-Pb)
@@ -244,15 +264,15 @@ for (i in 1:length(par_names)) {
       meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
       h=(U-L)/n # bin width 
       # Survival and growth 
-      S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal of the matrix
-      G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
+      S <- diag(S.fun(meshp, paramCont = paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+      G <- h * t(outer(meshp,meshp,GR.fun, paramCont = paramCont)) # Growth
       #Recruits distribution 
-      c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+      c_o <- h * matrix(rep(SDS.fun(meshp, paramCont = paramCont),n),n,n,byrow=F)
       # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
       #Probability of flowering
-      Pb = (FL.fun(meshp))
+      Pb = (FL.fun(meshp, paramCont = paramCont))
       #Number of seeds produced according to adult size
-      b_seed = (SDP.fun(meshp))
+      b_seed = (SDP.fun(meshp, paramCont = paramCont))
       FecALL= Pb * b_seed
       # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
       S_new <- S * (1-Pb)
@@ -303,6 +323,8 @@ mean_disc_perturbs <- disc_perturbs %>%
   group_by(param_name) %>% 
   summarize(param_OGval = mean(param_OGval, na.rm = TRUE), sens_mean = mean(sens, na.rm = TRUE), elas_mean = mean(elas, na.rm = TRUE))
 
+#dir.create("./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv")
+saveRDS(mean_disc_perturbs, file = "./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/discreteParamElasticity.RDS")
 ## get elasticity/sensitivity for other vital rate parameters (model parameters in vital rate models)
 # previous SB vital rates
 germ.rt <-  0.1629526
@@ -484,6 +506,8 @@ model_perturbs[is.infinite(model_perturbs$sens),c("sens", "elas")] <- NA
 mean_model_perturbs <- model_perturbs %>% 
   group_by(param_name) %>% 
   summarize(param_OGval = mean(param_OGval, na.rm = TRUE), sens_mean = mean(sens, na.rm = TRUE), elas_mean = mean(elas, na.rm = TRUE))
+
+saveRDS(mean_model_perturbs, file = "./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/continuousParamElasticity.RDS")
 
 #%%%AES%%% double check how sensitivity and elasticity are calculated...
 #### DD all dat IPM ####

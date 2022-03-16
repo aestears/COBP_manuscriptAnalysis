@@ -293,6 +293,10 @@ ggplot(data = param_fig) +
 plot(density(as.numeric(allDI_lambdas)))
 abline(v = lam_all_DI, col = 'red', lwd = 2, lty = 2)
 abline(v = mean(allDI_lambdas), col = "blue", lwd = 2, lty = 2)
+## calculate 95% CI
+SE <- sd(allDI_lambdas)/sqrt(1000)
+mean <- mean(allDI_lambdas)
+allDI_CI <- c((mean - 1.96*SE),(mean + 1.96*SE))
 
 #### DI, all-site data for first half of data ####
 ### Define the demographic functions and parameters ###
@@ -965,7 +969,7 @@ mat_all_DD <-Pkernel+Fkernel
 
 eigenMat <- base::eigen(mat_all_DD)
 # get the lambda
-eigenMat$values[1]
+lam_all_DD <-  eigenMat$values[1]
 
 eigenMat$vectors
 
@@ -2035,13 +2039,11 @@ L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
 U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
 n <-500 # bins
 K <- array(0,c(n+1,n+1))
-
 # Setting up the kernels
 K <- array(0,c(n+1,n+1))
 b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
 meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
 h=(U-L)/n # bin width 
-
 # Survival and growth 
 S <- diag(S.fun(z = meshp, paramCont = paramsSoap)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont = paramsSoap)) # Growth
@@ -2062,22 +2064,126 @@ G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
-
 # seedbank (first column of your K)
 Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
-
 # Make the full P kernel
 Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
-
 ## make the F kernel
 Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
-
 Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
-
 Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
-
 mat_all_Soap <-Pkernel+Fkernel
 lam_all_Soap <- eigen(mat_all_Soap)$values[1]
+
+## bootstrap 95% CI
+soapDI_bootCI_lambdas <- numeric(1000L)
+# make a list to hold the model parameters
+soapDI_bootCI_params <- list()
+# set seedbank parameters, which don't change
+outSB <- outSB_all #SB to continuous stage
+staySB <- staySB_all # staying in SB
+goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
+goSB <- goSB_all # seeds go to the seedbank
+surv.seeds <-  0.9 # survival of seeds
+# Now, we refit the vital rate models, and refit the IPM
+for(i in 1:1000) {
+  ## sample continuous data
+  sample_ind <- seq(1, nrow(datSoap), by = 1)
+  
+  boot_data_ind   <- sample(x = sample_ind, size = length(sample_ind), replace = TRUE)
+  
+  boot_data <- datSoap[boot_data_ind,]
+  
+  ## fit vital rate models
+  ## Survival ($s(z)$)
+  datNow <- boot_data[boot_data$Location=="Soapstone",]
+  survDat_now <- datNow[datNow$flowering==0 | is.na(datNow$flowering),]
+  survMod_now <- glm(survives_tplus1 ~ log_LL_t , data = survDat_now, family = binomial)
+  ## Growth ($G(z',z)$)
+  # lm w/ log-transformed size_t and size_t+1
+  sizeMod_now <- lm(log_LL_tplus1 ~ log_LL_t , data = datNow)
+  ## Number of seeds produced, according to plant size ($b(z)$)
+  seedDat_now <- datNow[datNow$flowering == 1,]
+  # fit a negative binomial glm (poisson was overdispersed)
+  seedMod_now <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_now)
+  ## Flowering probability ($p_b(z)$)
+  flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = datNow, family = binomial)))
+  ## Distribution of recruit size ($c_o(z')$)
+  recD_now <- datNow[datNow$seedling == 1,]
+  recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
+  
+  # update the parameter list with parameters from this iteration
+  paramCont_now<- list(
+    g_int     = coef(sizeMod_now)[1], # growth 
+    g_slope   = coef(sizeMod_now)[2],
+    g_dd      = coef(sizeMod_now)[3],
+    g_sd      = summary(sizeMod_now)$sigma,
+    s_int     = coef(survMod_now)[1], # survival
+    s_slope   = coef(survMod_now)[2],
+    s_dd      = coef(survMod_now)[3],
+    p_b_int   = coef(flwrMod_now)[1], #probability of flowering
+    p_b_slope = coef(flwrMod_now)[2],
+    p_b_slope_2 = coef(flwrMod_now)[3],
+    p_b_dd    = coef(flwrMod_now)[4],
+    b_int   = coef(seedMod_now)[1], #seed production
+    b_slope = coef(seedMod_now)[2],
+    c_o_mu    = coef(recMod_now), #recruit size distribution
+    c_o_sd    = summary(recMod_now)$sigma,
+    outSB  = outSB_all,
+    staySB = staySB_all,
+    goSB   = goSB_all, 
+    goCont = goCont_all                  
+  )
+  
+  K <- array(0,c(n+1,n+1))
+  
+  # I recommend you set i = 1, set n low to say 10 
+  
+  # Setting up the kernels
+  b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+  meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+  
+  h=(U-L)/n # bin width 
+  
+  # Survival and growth 
+  S <- diag(S.fun(meshp, paramCont = paramCont_now)) # Survival # put survival probabilities in the diagonal of the matrix
+  G <- h * t(outer(meshp,meshp,GR.fun, paramCont = paramCont_now)) # Growth
+  #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+  c_o <- h * matrix(rep(SDS.fun(meshp, paramCont = paramCont_now),n),n,n,byrow=F)
+  #Probability of flowering
+  Pb = (FL.fun(meshp, paramCont = paramCont_now))
+  #Number of seeds produced according to adult size
+  b_seed = (SDP.fun(meshp, paramCont = paramCont_now))
+  FecALL= Pb * b_seed
+  # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+  S_new <- S * (1-Pb)
+  # Control for eviction:
+  G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  # make the continuous part of the P matrix
+  Pkernel.cont <- as.matrix(G %*% S_new)
+  # seedbank (first column of your K)
+  Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+  # Make the full P kernel
+  Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+  ## make the F kernel
+  Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+  Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+  Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+  
+  mat <-Pkernel+Fkernel
+  
+  eigenMat <- base::eigen(mat)
+  # save the lambda
+  soapDI_bootCI_lambdas[i] <- eigenMat$values[1]
+  # save the parameters
+  soapDI_bootCI_params[[i]] <- paramCont_now
+}
+
+## calculate 95% CI for lambdas
+SE <- sd(soapDI_bootCI_lambdas)/sqrt(1000)
+mean <- mean(soapDI_bootCI_lambdas)
+soapDI_CI <- c((mean - 1.96*SE),(mean + 1.96*SE))
 
 ## fit IPM for Base data
 #plot the results
@@ -2138,3 +2244,113 @@ Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 
 mat_all_Base <-Pkernel+Fkernel
 lam_all_Base <- eigen(mat_all_Base)$values[1]
+
+## bootstrap 95% CI
+baseDI_bootCI_lambdas <- numeric(1000L)
+# make a list to hold the model parameters
+baseDI_bootCI_params <- list()
+# set seedbank parameters, which don't change
+outSB <- outSB_all #SB to continuous stage
+staySB <- staySB_all # staying in SB
+goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
+goSB <- goSB_all # seeds go to the seedbank
+surv.seeds <-  0.9 # survival of seeds
+# Now, we refit the vital rate models, and refit the IPM
+for(i in 1:1000) {
+  ## sample continuous data
+  sample_ind <- seq(1, nrow(datBase), by = 1)
+  
+  boot_data_ind   <- sample(x = sample_ind, size = length(sample_ind), replace = TRUE)
+  
+  boot_data <- datBase[boot_data_ind,]
+  
+  ## fit vital rate models
+  ## Survival ($s(z)$)
+  datNow <- boot_data[boot_data$Location=="FEWAFB",]
+  survDat_now <- datNow[datNow$flowering==0 | is.na(datNow$flowering),]
+  survMod_now <- glm(survives_tplus1 ~ log_LL_t , data = survDat_now, family = binomial)
+  ## Growth ($G(z',z)$)
+  # lm w/ log-transformed size_t and size_t+1
+  sizeMod_now <- lm(log_LL_tplus1 ~ log_LL_t , data = datNow)
+  ## Number of seeds produced, according to plant size ($b(z)$)
+  seedDat_now <- datNow[datNow$flowering == 1,]
+  # fit a negative binomial glm (poisson was overdispersed)
+  seedMod_now <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_now)
+  ## Flowering probability ($p_b(z)$)
+  flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = datNow, family = binomial)))
+  ## Distribution of recruit size ($c_o(z')$)
+  recD_now <- datNow[datNow$seedling == 1,]
+  recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
+  
+  # update the parameter list with parameters from this iteration
+  paramCont_now<- list(
+    g_int     = coef(sizeMod_now)[1], # growth 
+    g_slope   = coef(sizeMod_now)[2],
+    g_dd      = coef(sizeMod_now)[3],
+    g_sd      = summary(sizeMod_now)$sigma,
+    s_int     = coef(survMod_now)[1], # survival
+    s_slope   = coef(survMod_now)[2],
+    s_dd      = coef(survMod_now)[3],
+    p_b_int   = coef(flwrMod_now)[1], #probability of flowering
+    p_b_slope = coef(flwrMod_now)[2],
+    p_b_slope_2 = coef(flwrMod_now)[3],
+    p_b_dd    = coef(flwrMod_now)[4],
+    b_int   = coef(seedMod_now)[1], #seed production
+    b_slope = coef(seedMod_now)[2],
+    c_o_mu    = coef(recMod_now), #recruit size distribution
+    c_o_sd    = summary(recMod_now)$sigma,
+    outSB  = outSB_all,
+    staySB = staySB_all,
+    goSB   = goSB_all, 
+    goCont = goCont_all                  
+  )
+  
+  K <- array(0,c(n+1,n+1))
+  
+  # I recommend you set i = 1, set n low to say 10 
+  
+  # Setting up the kernels
+  b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+  meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+  
+  h=(U-L)/n # bin width 
+  
+  # Survival and growth 
+  S <- diag(S.fun(meshp, paramCont = paramCont_now)) # Survival # put survival probabilities in the diagonal of the matrix
+  G <- h * t(outer(meshp,meshp,GR.fun, paramCont = paramCont_now)) # Growth
+  #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+  c_o <- h * matrix(rep(SDS.fun(meshp, paramCont = paramCont_now),n),n,n,byrow=F)
+  #Probability of flowering
+  Pb = (FL.fun(meshp, paramCont = paramCont_now))
+  #Number of seeds produced according to adult size
+  b_seed = (SDP.fun(meshp, paramCont = paramCont_now))
+  FecALL= Pb * b_seed
+  # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+  S_new <- S * (1-Pb)
+  # Control for eviction:
+  G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  # make the continuous part of the P matrix
+  Pkernel.cont <- as.matrix(G %*% S_new)
+  # seedbank (first column of your K)
+  Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+  # Make the full P kernel
+  Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+  ## make the F kernel
+  Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+  Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+  Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+  
+  mat <-Pkernel+Fkernel
+  
+  eigenMat <- base::eigen(mat)
+  # save the lambda
+  baseDI_bootCI_lambdas[i] <- eigenMat$values[1]
+  # save the parameters
+  baseDI_bootCI_params[[i]] <- paramCont_now
+}
+
+## calculate 95% CI for lambdas
+SE <- sd(baseDI_bootCI_lambdas)/sqrt(1000)
+mean <- mean(baseDI_bootCI_lambdas)
+baseDI_CI <- c((mean - 1.96*SE),(mean + 1.96*SE))
