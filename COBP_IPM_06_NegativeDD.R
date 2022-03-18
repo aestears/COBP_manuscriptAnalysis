@@ -869,3 +869,23 @@ soapProjIPMs_DI[[i]] <- IPM_out_list
 
 
 
+#### compare lambdas and subpop N ####
+siteDI_lams <- sapply(site_IPMs_DI, function(x) as.numeric(eigen(x)$values[1]))
+siteDI_lams <- data.frame("Site" = names(siteDI_lams), "log_lambda" = log(siteDI_lams), "type" = "DI")
+siteDD_lams <- sapply(site_IPMs_DD, function(x) as.numeric(eigen(x)$values[1]))
+siteDD_lams <- data.frame("Site" = names(siteDD_lams), "log_lambda" = log(siteDD_lams), "type" = "DD")
+
+site_lams <- rbind(siteDI_lams, siteDD_lams)
+
+meanN_subPop <- N_site %>% 
+  group_by(Site) %>% 
+  summarize("meanN_t" = mean(N_Site_t))
+
+lam_N <- left_join(site_lams, meanN_subPop)
+
+ggplot(data = lam_N) + 
+  geom_point(aes(x = meanN_t, y = log_lambda, col = type)) + 
+  geom_smooth(aes(x = meanN_t, y = log_lambda, col = type), se = FALSE, method = "lm") +
+  theme_classic(
+    
+  )

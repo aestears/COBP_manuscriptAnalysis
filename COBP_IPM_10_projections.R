@@ -1348,3 +1348,11 @@ popSizeFig <- ggplot(datN) +
 #### make a multipanel figure ####
 vertPlots <- ggarrange(iterationLamFig, popSizeFig, ncol = 1, nrow = 2, align = "v", legend = "bottom", common.legend = TRUE, labels = c("A", "B"), heights= c(1.5,1))
 ggarrange(vertPlots,  stochLamDensitFig, ncol = 2, nrow = 1, widths = c(1.5, .75), labels = c(NA, "C"), label.y = 0.9, label.x = .115)
+
+
+## save current projections
+saveRDS(soapProjIPMs, file = "/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/COBP_analysis/intermediate_analysis_Data/Projections/SoapstoneNormalClim_projections.RDS")
+saveRDS(soapProjIPMs_hot, file = "/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/COBP_analysis/intermediate_analysis_Data/Projections/SoapstoneHotterClim_projections.RDS")
+
+saveRDS(baseProjIPMs, file = "/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/COBP_analysis/intermediate_analysis_Data/Projections/BaseNormalClim_projections.RDS")
+saveRDS(baseProjIPMs_hot, file = "/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/COBP_analysis/intermediate_analysis_Data/Projections/BaseHotterClim_projections.RDS")
