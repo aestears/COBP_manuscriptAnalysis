@@ -9,7 +9,7 @@ library(ipmr)
 library(rstatix)
 
 # read in data
-dat_all <- read.csv(file = "/Users/astears/COBP_project/allDat_plus_contSeedlings.csv")
+dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
 
 for (i in 1:length(unique(dat_all$Site))) {
   dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i],]

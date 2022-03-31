@@ -7,7 +7,7 @@
 library(tidyverse)
 
 # load data from script 1
-dat_all <- read.csv(file = "/Users/astears/COBP_project/allDat_plus_contSeedlings.csv")
+dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
 
 #### fit vital rate models for 2018-2019, each subpopulation ####
 subPop_first_VRs <- list()
@@ -112,6 +112,10 @@ vrDF <- as.data.frame(apply(vrDF, 2, unlist))
 vrDF$mean <- apply(X = vrDF, MARGIN = 1, FUN = mean)
 vrDF$sd <- apply(X = vrDF[,1:12], MARGIN = 1, FUN = sd)
 vrDF$CV <- vrDF$sd/vrDF$mean * 100
+# calculate the "quartile coefficient of dispersion" https://en.wikipedia.org/wiki/Quartile_coefficient_of_dispersion (Q3-Q1)/(Q3+Q1)
+quantiles <- as.data.frame(apply(vrDF[,1:12], MARGIN = 1, FUN = function(x) quantile(x, probs = c(.25, .75))))
+quartile_coef_disp <- apply(quantiles, MARGIN = 2, FUN = function(x) (x[2] - x[1])/(x[2] + x[1]))
+vrDF$quarDisp <- quartile_coef_disp
 
 # simulate variance of sb parameters as normal dists w/ mean of .5 and sd of .175??
 #vrDF[13:16,"sd"]<- .175
@@ -120,37 +124,46 @@ vrDF$CV <- vrDF$sd/vrDF$mean * 100
 vrDF <- vrDF[1:12,] 
 
 #### read in elasticity data ####
-#contParamElas <- readRDS("./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/continuousParamElasticity.RDS")
-#discParamElas <- readRDS("./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/discreteParamElasticity.RDS")
+contParamElas <- readRDS("./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/continuousParamElasticity.RDS")
+discParamElas <- readRDS("./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/discreteParamElasticity.RDS")
 # reorder correctly
 contParamElas <- contParamElas[match(c("growth_(Intercept)", "growth_log_LL_t", "growth_stndDev", "survival_(Intercept)", "survival_log_LL_t","flowering_(Intercept)", "flowering_log_LL_t", "flowering_I(log_LL_t^2)","seedProduction_(Intercept)", "seedProduction_log_LL_t", "recruitDist_(Intercept)", "recruitDist_stndDev"), contParamElas$param_name),] 
 ## put elasticity in the vrDF
 vrDF$Elas <- contParamElas$elas_mean
 
 ## add data for sb params? 
-vrDF[13,"mean"] <- mean(c(13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
-vrDF[13, "sd"] <- sd(c(13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
-
-vrDF[14,"mean"] <- mean(c(81,61,54)/100 * 0.89)
-vrDF[14, "sd"] <- sd(c(81,61,54)/100 * 0.89)
-
-vrDF[15, "mean"] <- 0.5
-vrDF[15, "sd"] <- 0.175
-
+# vrDF[13,"mean"] <- mean(c(13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
+# vrDF[13, "sd"] <- sd(c(13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
+# 
+# vrDF[14,"mean"] <- mean(c(81,61,54)/100 * 0.89)
+# vrDF[14, "sd"] <- sd(c(81,61,54)/100 * 0.89)
+# 
+# vrDF[15, "mean"] <- 0.5
+# vrDF[15, "sd"] <- 0.175
+# simulate the sb params using a uniform distribution 
 rownames(vrDF[13:15,]) <- c("germ.rt", "surv.rt", "viab.rt")
+vrDF[13:15,"quarDisp"] <- c(.75-.25)/(.75+.25)
 
 vrDF[13:15,"Elas"] <- discParamElas$elas_mean
-vrDF$CV <- vrDF$sd/vrDF$mean * 100
+# vrDF$CV <- vrDF$sd/vrDF$mean * 100
 #### calculate the correlation between CV and elasticity ####
-cor.test(vrDF$CV, vrDF$Elas, method = "pearson")
-plot(x = (vrDF$CV), y = vrDF$Elas, 
-     xlab = "Vital Rate Param. Coefficient of Variation (CV)", 
-     ylab = "Vital Rate Param. Elasticity", 
-     pch = 16, 
-     col = "grey20")
-abline(lm(vrDF$Elas ~ vrDF$CV), col = "red", lty = 2)
-text(x =650, y = -1.5, labels = "r = 0.116 \n P-value = 0.68 \n(t = 0.42, df = 13)")
+cor.test((vrDF$quarDisp[c(1:3,5:12)]), abs(vrDF$Elas[c(1:3,5:12)]), method = "pearson")
+ggplot(data = vrDF) +
+  geom_smooth(aes(x = (quarDisp), y = abs(Elas)),data = vrDF, method = "lm", lty = 2, col = "red", alpha = .3, se = FALSE) + 
+  geom_smooth(aes(x = (quarDisp), y = abs(Elas)),data = vrDF[c(1:3,5:12),], method = "lm", lty = 2, col = "blue", alpha = .3, se = FALSE) +
+  geom_point(aes(x = (quarDisp), y = abs(Elas))) +
+  xlab(c("Quartile coefficient of dispersion")) +
+  ylab(c("|Vital Rate Param. Elasticity|")) + 
+  theme_classic() 
 
+# plot(x = (vrDF$quarDisp), y = vrDF$Elas, 
+#      xlab = "Vital Rate Param. Coefficient of Variation (CV)", 
+#      ylab = "Vital Rate Param. Elasticity", 
+#      pch = 16, 
+#      col = "grey20")
+# abline(lm(vrDF$Elas ~ vrDF$quarDisp), col = "red", lty = 2)
+# abline(lm(Elas ~ quarDisp, data = vrDF[c(1:3,5:12),]), col = "blue", lty = 2)
+# text(x =650, y = -1.5, labels = "r = 0.116 \n P-value = 0.68 \n(t = 0.42, df = 13)")
 
 #### fit IPMs to get lambdas ####
 outSB <- outSB_all #SB to continuous stage

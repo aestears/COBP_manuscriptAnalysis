@@ -94,7 +94,7 @@ b_seed = (SDP.fun(meshp, paramCont))
 FecALL= Pb * b_seed
 
 # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
-S_new <- S * (1-Pb)
+S_new <- S * (1-(Pb))
 
 # Control for eviction:
 # this is equivalent to redistributing evicted sizes evenly among existing size classes 

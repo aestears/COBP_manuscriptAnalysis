@@ -28,31 +28,53 @@ flwrMod_soap <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , dat
 recD_soap <- datSoap[datSoap$seedling == 1,]
 recMod_soap <- lm(log_LL_t ~ 1, data = recD_soap)
 
+datBase <- dat_all[dat_all$Location=="FEWAFB",]
+survDat_Base <- datBase[datBase$flowering==0 | is.na(datBase$flowering),]
+survMod_Base <- glm(survives_tplus1 ~ log_LL_t , data = survDat_Base, family = binomial)
+newdata <- data.frame("log_LL_t" = seq(from = min(survDat_all$log_LL_t, na.rm = TRUE), 
+                                       to = max(survDat_all$log_LL_t, na.rm = TRUE),
+                                       length.out = 100))
+lines(x = newdata$log_LL_t, y = predict(object = survMod_all, newdata =  newdata, type = "response"), col = "red")
+
+## Growth ($G(z',z)$)
+# lm w/ log-transformed size_t and size_t+1
+sizeMod_Base <- lm(log_LL_tplus1 ~ log_LL_t , data = datBase)
+## Number of seeds produced, according to plant size ($b(z)$)
+seedDat_Base <- datBase[datBase$flowering == 1,]
+# fit a negative binomial glm (poisson was overdispersed)
+seedMod_Base <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_Base)
+## Flowering probability ($p_b(z)$)
+flwrMod_Base <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = datBase, family = binomial)))
+## Distribution of recruit size ($c_o(z')$)
+recD_Base <- datBase[datBase$seedling == 1,]
+recMod_Base <- lm(log_LL_t ~ 1, data = recD_Base)
+
 # survival
-survFig <- ggplot() +
+survFig <- ggplot() + 
   geom_point(aes(x = dat_all$log_LL_t, y = dat_all$survives_tplus1), col = "grey40", alpha = .3) +
+  geom_smooth(aes(x = log_LL_t, y = survives_tplus1), data = survDat_soap, method = "glm", method.args = list(family = "binomial"), col = '#00b159', fill = '#00b159',alpha = .4,  fullrange = TRUE) + 
+  geom_smooth(aes(x = log_LL_t, y = survives_tplus1), data = survDat_Base, method = "glm", method.args = list(family = "binomial"), col = "#f37735", fill = "#f37735", alpha = .4, fullrange = TRUE)  +
   ylab(c("Probability(survival)")) +
   xlab(c("log(size_t)")) +
   ggtitle("Survival") +
-  geom_line(aes(x = newdata$log_LL_t, y = predict(object = survMod_soap, newdata =  newdata, type = "response")), 
-            col = '#00b159', lwd = 1.5) +
-  geom_line(aes(x = newdata$log_LL_t, y = predict(object = survMod_Base, newdata =  newdata, type = "response")), 
-            col = "#f37735", lwd = 1.5) +
+  #geom_line(aes(x = newdata$log_LL_t, y = predict(object = survMod_soap, newdata =  newdata, type = "response")),  col = '#00b159', lwd = 1.5) +
+  #geom_line(aes(x = newdata$log_LL_t, y = predict(object = survMod_Base, newdata =  newdata, type = "response")),  col = "#f37735", lwd = 1.5) +
   theme_classic()
 # growth
 sizeFig <- ggplot() +
   geom_point(aes(x = dat_all$log_LL_t, y = dat_all$log_LL_tplus1), col = "grey40", alpha = .3) +
+  geom_smooth(aes(x = log_LL_t, y = log_LL_tplus1), data = datSoap, method = "lm", col = '#00b159', fill = '#00b159',alpha = .4,  fullrange = TRUE) + 
+  geom_smooth(aes(x = log_LL_t, y =log_LL_tplus1), data = datBase, method = "lm", col = "#f37735", fill = "#f37735", alpha = .4, fullrange = TRUE) +
   ylab(c("log(size_t+1)")) +
   xlab(c("log(size_t)")) +
   ggtitle("Growth")+
   geom_abline(aes(intercept = 0, slope = 1), col = "grey20", lty = 2) +
   scale_colour_manual(values = c("#f69f71", '#4cc88a'),
                       guide_legend(title = "Population")) +
-  geom_line(aes(x = newdata$log_LL_t, y = predict(object = sizeMod_soap, newdata =  newdata, type = "response")), 
-            col = '#00b159', lwd = 1.5) +
-  geom_line(aes(x = newdata$log_LL_t, y = predict(object = sizeMod_Base, newdata =  newdata, type = "response")), 
-            col = "#f37735", lwd = 1.5) +
+  #geom_line(aes(x = newdata$log_LL_t, y = predict(object = sizeMod_soap, newdata =  newdata, type = "response")),   col = '#00b159', lwd = 1.5) +
+ # geom_line(aes(x = newdata$log_LL_t, y = predict(object = sizeMod_Base, newdata =  newdata, type = "response")),  col = "#f37735", lwd = 1.5) +
   theme_classic()
+
 # # save legend
 legend <- get_legend(ggplot() +
              geom_point(aes(x = dat_all$log_LL_t, y = dat_all$log_LL_tplus1, col = dat_all$Location)) +
@@ -67,29 +89,37 @@ legend <- get_legend(ggplot() +
              geom_line(aes(x = newdata$log_LL_t, y = predict(object = sizeMod_Base, newdata =  newdata, type = "response")),
                        col = "#f37735", lwd = 1.5) +
              theme_classic())
+
 # flowering
-flwrFig <- ggplot() +
+flwrFig <- ggplot() + 
   geom_point(aes(x = dat_all$log_LL_t, y = dat_all$flowering), col = "grey40", alpha = .3) +
+  geom_smooth(aes(x = log_LL_t, y = flowering), formula = (y ~ poly(x,2)), data = datSoap, method = "glm", 
+              method.args = list(family = "binomial"), col = '#00b159', fill = '#00b159',alpha = .4,  fullrange = TRUE) + 
+  geom_smooth(aes(x = log_LL_t, y =flowering), formula = (y ~ poly(x,2)), data = datBase, method = "glm", 
+              method.args = list(family = "binomial"), col = "#f37735", fill = "#f37735", alpha = .4, fullrange = TRUE)  +
   ylab(c("Probability(flowering)")) +
   xlab(c("log(size_t)")) +
   ggtitle("Flowering ")+
   scale_colour_manual(values = c("#f69f71", '#4cc88a'), 
                       guide_legend(title = "Population")) +
-  geom_line(aes(x = newdata$log_LL_t, y = predict(object = flwrMod_soap, newdata =  newdata, type = "response")), 
-            col = '#00b159', lwd = 1.5) +
-  geom_line(aes(x = newdata$log_LL_t, y = predict(object = flwrMod_Base, newdata =  newdata, type = "response")), 
-            col = "#f37735", lwd = 1.5) +
+  #geom_line(aes(x = newdata$log_LL_t, y = predict(object = flwrMod_soap, newdata =  newdata, type = "response")),  col = '#00b159', lwd = 1.5) +
+  #geom_line(aes(x = newdata$log_LL_t, y = predict(object = flwrMod_Base, newdata =  newdata, type = "response")),  col = "#f37735", lwd = 1.5) +
   theme_classic()
+
 # seeds
 seedFig <- ggplot() +
   geom_point(aes(x = dat_all$log_LL_t, y = dat_all$Num_seeds), col = "grey40", alpha = .3) +
+  geom_smooth(aes(x = log_LL_t, y = Num_seeds), 
+              data =  seedDat_soap, method = MASS::glm.nb, 
+              col = '#00b159', fill = '#00b159',alpha = .4,  fullrange = TRUE) + 
+  geom_smooth(aes(x = log_LL_t, y = Num_seeds), 
+              data = seedDat_Base, method = MASS::glm.nb, 
+              col = "#f37735", fill = "#f37735", alpha = .4, fullrange = TRUE)  +
   ylab(c("Number of Seeds")) +
   xlab(c("log(size_t)")) +
   ggtitle("Seed Production")+
-  geom_line(aes(x = newdata$log_LL_t, y = predict(object = seedMod_soap, newdata =  newdata, type = "response")), 
-            col = '#00b159', lwd = 1.5) +
-  geom_line(aes(x = newdata$log_LL_t, y = predict(object = seedMod_Base, newdata =  newdata, type = "response")), 
-            col = "#f37735", lwd = 1.5) +
+  #geom_line(aes(x = newdata$log_LL_t, y = predict(object = seedMod_soap, newdata =  newdata, type = "response")),  col = '#00b159', lwd = 1.5) +
+  #geom_line(aes(x = newdata$log_LL_t, y = predict(object = seedMod_Base, newdata =  newdata, type = "response")),  col = "#f37735", lwd = 1.5) +
   theme_classic()
 
 ggpubr::ggarrange(survFig, sizeFig, flwrFig, seedFig, align = "hv", 
@@ -106,7 +136,7 @@ contSeedlings_IPM$sub_kernels$continuous_to_seedbank
 ## visualize the full kernel 
 # define the meshpoints 
 meshpts <- seq(from = L, to = U, length = 500)
-# set up the paletteot the continuous part of the kernel (leave out first two rows and cols that correspond to the discrete stages)
+# set up the palette to the continuous part of the kernel (leave out first two rows and cols that correspond to the discrete stages)
 ## make the entire figure as a lattice plot
 graphics::layout(mat = matrix(c(1,3,2,4), nrow = 2, ncol = 2), widths = c(1.5,6),heights = c(6,1.5))
 ## continuous to seedbank
