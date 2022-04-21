@@ -558,7 +558,18 @@ saveRDS(siteDD_bootCI_lambdas, file = "/Users/astears/COBP_project/site_level_IP
 saveRDS(siteDD_bootCI_params, file = "/Users/astears/COBP_project/site_level_IPMs/site_level_DD_bootCI_params")
 
 #### calculate 95% confidence intervals for lambdas ####
+## DI lambda CIs
+## calculate 95% CI for lambdas
+DI_lams_CIs <- as.data.frame(lapply(X = siteDI_bootCI_lambdas, FUN = function(x) 
+  c(log(mean(x) - 1.96*(sd(x)/sqrt(1000))),log(mean(x) + 1.96*(sd(x)/sqrt(1000))))
+  ))
+names(DI_lams_CIs) <- unique(dat_all$Site)
 
+## DD lambda CIs
+DD_lams_CIs <- as.data.frame(lapply(X = siteDD_bootCI_lambdas, FUN = function(x) 
+  c(log(mean(x) - 1.96*(sd(x)/sqrt(1000))),log(mean(x) + 1.96*(sd(x)/sqrt(1000))))
+))
+names(DD_lams_CIs) <- unique(dat_all$Site)
 
 #### compare the vital rate models w/ and w/out DD--use AIC ####
 ## Density Independent

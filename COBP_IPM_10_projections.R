@@ -78,7 +78,7 @@ data_list <- list(
 )
 
 # inital population state
-init_size_state <- runif(500)
+init_size_state <- runif(1500)
 
 base_IPM <- init_ipm(sim_gen   = "general", 
                      di_dd     = "di", 
@@ -164,11 +164,11 @@ base_IPM <- init_ipm(sim_gen   = "general",
     size = c(
       min(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # lower bound (L)
       max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
-      500 # number of mesh points
+      1500 # number of mesh points
     )
   ) %>% 
   define_pop_state(
-    n_size = runif(500),
+    n_size = runif(1500),
     n_b = 400, 
     
   ) %>% 
@@ -200,7 +200,7 @@ data_list <- list(
 )
 
 # inital population state
-init_size_state <- runif(500)
+init_size_state <- runif(1500)
 
 soapstone_IPM <- init_ipm(sim_gen   = "general", 
                           di_dd     = "di", 
@@ -286,11 +286,11 @@ soapstone_IPM <- init_ipm(sim_gen   = "general",
     size = c(
       min(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # lower bound (L)
       max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
-      500 # number of mesh points
+      1500 # number of mesh points
     )
   ) %>% 
   define_pop_state(
-    n_size = runif(500),
+    n_size = runif(1500),
     n_b = 400, 
     
   ) %>% 
@@ -416,7 +416,7 @@ elas_test <- matrix(as.vector(sens_test)*as.vector(mat_all_DI)/lambda(contSeedli
 ## iterate through this IPM 1000 times
 # make a list to hold the output
 soapProjIPMs <- list()
-for (i in 1:10) {
+for (i in 1:50) {
   temp_IPM <- init_ipm(sim_gen   = "general", 
                        di_dd     = "dd", 
                        det_stoch = "stoch",
@@ -519,9 +519,9 @@ for (i in 1:10) {
       n_size = init_size_state,
       n_b = init_sb_state, 
     ) %>% 
-    make_ipm( iterate = TRUE, iterations = 100,
+    make_ipm( iterate = TRUE, iterations = 50,
               normalize_pop_size = FALSE,
-              kernel_seq = sample(1:3, 100, replace = TRUE)
+              kernel_seq = sample(1:3, 50, replace = TRUE)
     )
   
   ## get the vector of lambdas
@@ -861,7 +861,7 @@ init_sb_state <- (c(right_ev(soapstone_IPM)$b_w, right_ev(soapstone_IPM)$size_w)
 ## iterate through this IPM 1000 times
 # make a list to hold the output
 soapProjIPMs_hot <- list()
-for (i in 1:10) {
+for (i in 1:50) {
   temp_IPM <- init_ipm(sim_gen   = "general", 
                        di_dd     = "dd", 
                        det_stoch = "stoch",
@@ -964,9 +964,9 @@ for (i in 1:10) {
       n_size = init_size_state,
       n_b = init_sb_state, 
     ) %>% 
-    make_ipm( iterate = TRUE, iterations = 100,
+    make_ipm( iterate = TRUE, iterations = 50,
               normalize_pop_size = FALSE,
-              kernel_seq = sample(1:3, 100, replace = TRUE)
+              kernel_seq = sample(1:3, 50, replace = TRUE)
     )
   
   ## get the vector of lambdas
@@ -1187,7 +1187,7 @@ for (i in 1:10) {
       n_b = init_sb_state, 
     ) %>% 
     make_ipm( iterate = TRUE, iterations = 100,
-              normalize_pop_size = FALSE,
+              normalize_pop_size = TRUE,
               kernel_seq = sample(1:3, 100, replace = TRUE)
     )
   
@@ -1211,7 +1211,7 @@ for (i in 1:10) {
 soapStochLams <- sapply(X = soapProjIPMs, FUN = function(x) x$stochLambda)
 soapIteratelams <- as.data.frame(sapply(X = soapProjIPMs, FUN = function(x) x$iterationLambdas))
 names(soapIteratelams) <- paste0("Iteration_",1:10)
-soapIteratelams$Year <- 1:100
+soapIteratelams$Year <- 1:50
 soapIteratelams <- pivot_longer(soapIteratelams, cols = 1:10, names_to = "Iteration", values_to = "iterateLam")
 soapIteratelams$iterateLam <- log(soapIteratelams$iterateLam)
 # for hotter climate scenario
@@ -1219,7 +1219,7 @@ soapStochLams_hot <- sapply(X = soapProjIPMs_hot, FUN = function(x) x$stochLambd
 soapIteratelams_hot <- as.data.frame(sapply(X = soapProjIPMs_hot, 
                                             FUN = function(x) x$iterationLambdas))
 names(soapIteratelams_hot) <- paste0("Iteration_",1:10)
-soapIteratelams_hot$Year <- 1:100
+soapIteratelams_hot$Year <- 1:50
 soapIteratelams_hot <- pivot_longer(soapIteratelams_hot, cols = 1:10, names_to = "Iteration", values_to = "iterateLam")
 soapIteratelams_hot$iterateLam <- log(soapIteratelams_hot$iterateLam)
 
@@ -1228,7 +1228,7 @@ soapIteratelams_hot$iterateLam <- log(soapIteratelams_hot$iterateLam)
 baseStochLams <- sapply(X = baseProjIPMs, FUN = function(x) x$stochLambda)
 baseIteratelams <- as.data.frame(sapply(X = baseProjIPMs, FUN = function(x) x$iterationLambdas))
 names(baseIteratelams) <- paste0("Iteration_",1:10)
-baseIteratelams$Year <- 1:100
+baseIteratelams$Year <- 1:50
 baseIteratelams <- pivot_longer(baseIteratelams, cols = 1:10, names_to = "Iteration", values_to = "iterateLam")
 baseIteratelams$iterateLam <- log(baseIteratelams$iterateLam)
 # for hotter climate scenario
@@ -1236,7 +1236,7 @@ baseStochLams_hot <- sapply(X = baseProjIPMs_hot, FUN = function(x) x$stochLambd
 baseIteratelams_hot <- as.data.frame(sapply(X = baseProjIPMs_hot, 
                                             FUN = function(x) x$iterationLambdas))
 names(baseIteratelams_hot) <- paste0("Iteration_",1:10)
-baseIteratelams_hot$Year <- 1:100
+baseIteratelams_hot$Year <- 1:50
 baseIteratelams_hot <- pivot_longer(baseIteratelams_hot, cols = 1:10, names_to = "Iteration", values_to = "iterateLam")
 baseIteratelams_hot$iterateLam <- log(baseIteratelams_hot$iterateLam)
 
@@ -1292,8 +1292,21 @@ stochLamDensitFig <- ggplot(data = stochLams_long) +
   theme_classic() + 
   theme(plot.margin = margin(50, 15, 50, 15))
 
-## plot of population sizes (
+## plot of population sizes 
 # soapstone 
+# make an empty list to hold the pop. size data
+startN <- list(0L)
+
+for (i in 1:length(soapProjIPMs)) {
+  tempLams <- soapProjIPMs[[i]]$iterationLambdas
+  startN[[i]] <- rep(NA, length.out = 50)
+  startN[[i]][1] <- 1500
+  
+  for (j in 1:length(tempLams)) {
+    startN[[i]][j+1] <- startN[[i]][j] * tempLams[j]
+  }
+  }
+
 soapN <- as.data.frame(sapply(soapProjIPMs, function(x) colSums(x[[3]])))
 # get mean final population size
 soapN_tot <- mean(as.numeric(soapN[100,]))
@@ -1341,6 +1354,7 @@ popSizeFig <- ggplot(datN) +
   geom_line(aes(x = Year, y = N, col = Climate, lty = Iteration), alpha = 0.2) + 
   geom_line(aes(x = Year, y = meanN, col = Climate)) +
   facet_wrap(.~Population) +
+  xlim(c(0,50)) +
   scale_linetype_manual(guide = "none", values = rep(1, length.out = 10)) +
   ylab("Population Size") +
   theme_classic()
