@@ -519,14 +519,14 @@ for (i in 1:50) {
       n_size = init_size_state,
       n_b = init_sb_state, 
     ) %>% 
-    make_ipm( iterate = TRUE, iterations = 50,
+    make_ipm( iterate = TRUE, iterations = 20,
               normalize_pop_size = FALSE,
-              kernel_seq = sample(1:3, 50, replace = TRUE)
+              kernel_seq = sample(1:3, 20, replace = TRUE)
     )
   
   ## get the vector of lambdas
   IPM_out_list <- list(
-    stochLambda = suppressMessages(lambda(temp_IPM, type_lambda = "stochastic", burn_in = .15)),
+    stochLambda = suppressMessages(lambda(temp_IPM, type_lambda = "stochastic", burn_in = .05)),
     iterationLambdas = temp_IPM$pop_state$lambda,
     sizeDists <- temp_IPM$pop_state$n_size,
     SBsize <- temp_IPM$pop_state$n_b
@@ -639,7 +639,7 @@ init_sb_state <- (c(right_ev(base_IPM)$b_w, right_ev(base_IPM)$size_w) / sum(c(r
 ## iterate through this IPM 1000 times
 # make a list to hold the output
 baseProjIPMs <- list()
-for (i in 1:10) {
+for (i in 1:50) {
   temp_IPM <- init_ipm(sim_gen   = "general", 
                        di_dd     = "dd", 
                        det_stoch = "stoch",
@@ -742,14 +742,14 @@ for (i in 1:10) {
       n_size = init_size_state,
       n_b = init_sb_state, 
     ) %>% 
-    make_ipm( iterate = TRUE, iterations = 100,
+    make_ipm( iterate = TRUE, iterations = 20,
               normalize_pop_size = FALSE,
-              kernel_seq = sample(1:3, 100, replace = TRUE)
+              kernel_seq = sample(1:3, 20, replace = TRUE)
     )
   
   ## get the vector of lambdas
   IPM_out_list <- list(
-    stochLambda = suppressMessages(lambda(temp_IPM, type_lambda = "stochastic", burn_in = .15)),
+    stochLambda = suppressMessages(lambda(temp_IPM, type_lambda = "stochastic", burn_in = .05)),
     iterationLambdas = temp_IPM$pop_state$lambda,
     sizeDists <- temp_IPM$pop_state$n_size,
     SBsize <- temp_IPM$pop_state$n_b
@@ -964,14 +964,14 @@ for (i in 1:50) {
       n_size = init_size_state,
       n_b = init_sb_state, 
     ) %>% 
-    make_ipm( iterate = TRUE, iterations = 50,
+    make_ipm( iterate = TRUE, iterations = 20,
               normalize_pop_size = FALSE,
-              kernel_seq = sample(1:3, 50, replace = TRUE)
+              kernel_seq = sample(1:3, 20, replace = TRUE)
     )
   
   ## get the vector of lambdas
   IPM_out_list <- list(
-    stochLambda = suppressMessages(lambda(temp_IPM, type_lambda = "stochastic", burn_in = .15)),
+    stochLambda = suppressMessages(lambda(temp_IPM, type_lambda = "stochastic", burn_in = .05)),
     iterationLambdas = temp_IPM$pop_state$lambda,
     sizeDists <- temp_IPM$pop_state$n_size,
     SBsize <- temp_IPM$pop_state$n_b
@@ -1083,7 +1083,7 @@ init_sb_state <- (c(right_ev(base_IPM)$b_w, right_ev(base_IPM)$size_w) / sum(c(r
 ## iterate through this IPM 1000 times
 # make a list to hold the output
 baseProjIPMs_hot <- list()
-for (i in 1:10) {
+for (i in 1:50) {
   temp_IPM <- init_ipm(sim_gen   = "general", 
                        di_dd     = "dd", 
                        det_stoch = "stoch",
@@ -1186,14 +1186,14 @@ for (i in 1:10) {
       n_size = init_size_state,
       n_b = init_sb_state, 
     ) %>% 
-    make_ipm( iterate = TRUE, iterations = 100,
+    make_ipm( iterate = TRUE, iterations = 20,
               normalize_pop_size = TRUE,
-              kernel_seq = sample(1:3, 100, replace = TRUE)
+              kernel_seq = sample(1:3, 20, replace = TRUE)
     )
   
   ## get the vector of lambdas
   IPM_out_list <- list(
-    stochLambda = suppressMessages(lambda(temp_IPM, type_lambda = "stochastic", burn_in = .15)),
+    stochLambda = suppressMessages(lambda(temp_IPM, type_lambda = "stochastic", burn_in = .05)),
     iterationLambdas = temp_IPM$pop_state$lambda,
     sizeDists <- temp_IPM$pop_state$n_size,
     SBsize <- temp_IPM$pop_state$n_b
@@ -1202,7 +1202,6 @@ for (i in 1:10) {
   baseProjIPMs_hot[[i]] <- IPM_out_list
 }
 
-
 #### plot the projected lambdas ####
 # soapProjIPMs; soapProj_IPMs_hot; baseProjIPMs; baseProjIPMs_hot
 
@@ -1210,34 +1209,34 @@ for (i in 1:10) {
 # for normal climate scenario
 soapStochLams <- sapply(X = soapProjIPMs, FUN = function(x) x$stochLambda)
 soapIteratelams <- as.data.frame(sapply(X = soapProjIPMs, FUN = function(x) x$iterationLambdas))
-names(soapIteratelams) <- paste0("Iteration_",1:10)
-soapIteratelams$Year <- 1:50
-soapIteratelams <- pivot_longer(soapIteratelams, cols = 1:10, names_to = "Iteration", values_to = "iterateLam")
+names(soapIteratelams) <- paste0("Iteration_",1:50)
+soapIteratelams$Year <- 1:20
+soapIteratelams <- pivot_longer(soapIteratelams, cols = 1:50, names_to = "Iteration", values_to = "iterateLam")
 soapIteratelams$iterateLam <- log(soapIteratelams$iterateLam)
 # for hotter climate scenario
 soapStochLams_hot <- sapply(X = soapProjIPMs_hot, FUN = function(x) x$stochLambda)
 soapIteratelams_hot <- as.data.frame(sapply(X = soapProjIPMs_hot, 
                                             FUN = function(x) x$iterationLambdas))
-names(soapIteratelams_hot) <- paste0("Iteration_",1:10)
-soapIteratelams_hot$Year <- 1:50
-soapIteratelams_hot <- pivot_longer(soapIteratelams_hot, cols = 1:10, names_to = "Iteration", values_to = "iterateLam")
+names(soapIteratelams_hot) <- paste0("Iteration_",1:50)
+soapIteratelams_hot$Year <- 1:20
+soapIteratelams_hot <- pivot_longer(soapIteratelams_hot, cols = 1:50, names_to = "Iteration", values_to = "iterateLam")
 soapIteratelams_hot$iterateLam <- log(soapIteratelams_hot$iterateLam)
 
 # stoch lambdas for base
 # for normal climate scenario
 baseStochLams <- sapply(X = baseProjIPMs, FUN = function(x) x$stochLambda)
 baseIteratelams <- as.data.frame(sapply(X = baseProjIPMs, FUN = function(x) x$iterationLambdas))
-names(baseIteratelams) <- paste0("Iteration_",1:10)
-baseIteratelams$Year <- 1:50
-baseIteratelams <- pivot_longer(baseIteratelams, cols = 1:10, names_to = "Iteration", values_to = "iterateLam")
+names(baseIteratelams) <- paste0("Iteration_",1:50)
+baseIteratelams$Year <- 1:20
+baseIteratelams <- pivot_longer(baseIteratelams, cols = 1:50, names_to = "Iteration", values_to = "iterateLam")
 baseIteratelams$iterateLam <- log(baseIteratelams$iterateLam)
 # for hotter climate scenario
 baseStochLams_hot <- sapply(X = baseProjIPMs_hot, FUN = function(x) x$stochLambda)
 baseIteratelams_hot <- as.data.frame(sapply(X = baseProjIPMs_hot, 
                                             FUN = function(x) x$iterationLambdas))
-names(baseIteratelams_hot) <- paste0("Iteration_",1:10)
-baseIteratelams_hot$Year <- 1:50
-baseIteratelams_hot <- pivot_longer(baseIteratelams_hot, cols = 1:10, names_to = "Iteration", values_to = "iterateLam")
+names(baseIteratelams_hot) <- paste0("Iteration_",1:50)
+baseIteratelams_hot$Year <- 1:20
+baseIteratelams_hot <- pivot_longer(baseIteratelams_hot, cols = 1:50, names_to = "Iteration", values_to = "iterateLam")
 baseIteratelams_hot$iterateLam <- log(baseIteratelams_hot$iterateLam)
 
 soapIteratelams$Climate <- "Reference"
@@ -1257,7 +1256,8 @@ stochLams_long <- rbind(data.frame("Population" = "Soapstone", "Climate" = "Refe
                         data.frame("Population" = "Soapstone", "Climate" = "hot/dry", "logLambda_s" = soapStochLams_hot), 
                         data.frame("Population" = "FEWAFB", "Climate" = "Reference", "logLambda_s" = baseStochLams), 
                         data.frame("Population" = "FEWAFB", "Climate" = "hot/dry", "logLambda_s" = baseStochLams_hot))
-
+# subset to have data for only 20 years
+stochLams_long 
 stochLams <- data.frame("Population" = c("Soapstone", "Soapstone", "FEWAFB", "FEWAFB"), 
                         "Climate" = c("Reference", "hot/dry","Reference", "hot/dry"), 
                         "meanlogLambda_s" = c(mean(soapStochLams), mean(soapStochLams_hot), mean(baseStochLams), mean(baseStochLams_hot)))
@@ -1272,14 +1272,14 @@ iterateLams <- left_join(iterateLams, meanItLams)
 
 # plot of iteration lambdas
 iterationLamFig <- ggplot(data = iterateLams) +
-  geom_line(aes(x = Year, y = iterateLam, col = Climate, lty = Iteration), alpha = 0.1) + 
-  geom_line(aes(x = Year, y = meanIterateLam, col = Climate)) +
+  geom_line(aes(x = Year, y = iterateLam, col = Climate, lty = Iteration), alpha = 0.1) + geom_line(aes(x = Year, y = meanIterateLam, col = Climate)) +
   facet_wrap(.~Population) + 
-  scale_linetype_manual(values = c(1,1,1,1,1,1,1,1,1,1), guide = "none") +
+  scale_linetype_manual(values = rep(1, length.out = 50), guide = "none") +
   geom_hline(aes(yintercept = 0), col = "grey50", lty = 2) +
   #geom_hline(aes(yintercept = meanlogLambda_s, col = Climate)) +
   ylim(c(-.2,1.25)) +
   theme_classic() + 
+  xlim(c(0,20)) +
   ylab(expression(paste("log(", lambda, ")")))
 
 # density of stochastic lambdas 
@@ -1297,11 +1297,11 @@ stochLamDensitFig <- ggplot(data = stochLams_long) +
 # make an empty list to hold the pop. size data
 startN <- list(0L)
 
-for (i in 1:length(soapProjIPMs)) {
-  tempLams <- soapProjIPMs[[i]]$iterationLambdas
-  startN[[i]] <- rep(NA, length.out = 50)
+for (i in 1:length(baseProjIPMs_hot)) {
+  tempLams <- baseProjIPMs_hot[[i]]$iterationLambdas
+  startN[[i]] <- rep(NA, length.out = 20)
   startN[[i]][1] <- 1500
-  
+
   for (j in 1:length(tempLams)) {
     startN[[i]][j+1] <- startN[[i]][j] * tempLams[j]
   }
@@ -1309,53 +1309,62 @@ for (i in 1:length(soapProjIPMs)) {
 
 soapN <- as.data.frame(sapply(soapProjIPMs, function(x) colSums(x[[3]])))
 # get mean final population size
-soapN_tot <- mean(as.numeric(soapN[100,]))
+soapN_tot <- mean(as.numeric(soapN[21,]))
 soapN_hot <- as.data.frame(sapply(soapProjIPMs_hot, function(x) colSums(x[[3]]) ))
 # get mean final population size
-soapN_hot_tot <- mean(as.numeric(soapN_hot[100,]))
+soapN_hot_tot <- mean(as.numeric(soapN_hot[21,]))
 # base
 baseN <- as.data.frame(sapply(baseProjIPMs, function(x) colSums(x[[3]])))
-baseN_tot <- mean(as.numeric(baseN[100,]))
-baseN_hot <- as.data.frame(sapply(baseProjIPMs_hot, function(x) colSums(x[[3]])))
-baseN_hot_tot <- mean(as.numeric(baseN_hot[100,]))
+baseN_tot <- mean(as.numeric(baseN[21,]))
+baseN_hot <- as.data.frame(sapply(startN, function(x) print(x)))
+names(baseN_hot) <- paste0("Iteration_", 1:50)
+baseN_hot$Year <- 1:21
+baseN_hot <- pivot_longer(baseN_hot, cols = 1:50, names_to = "Iteration", values_to = "N")
+#baseN_hot_tot <- rowMeans(baseN_hot)
 
-names(soapN) <- paste0("Iteration_", 1:10)
+baseN_hot <- as.data.frame(sapply(baseProjIPMs_hot, function(x) colSums(x[[3]])))
+baseN_hot_tot <- mean(as.numeric(baseN_hot[21,]))
+
+names(soapN) <- paste0("Iteration_", 1:50)
 soapN$meanN <- apply(soapN, MARGIN = 1, FUN = mean )
 soapN$Population <- "Soapstone"
 soapN$Climate <- "Reference"
-soapN$Year <- 1:101
-soapN <- pivot_longer(soapN, cols = paste0("Iteration_", 1:10), names_to = "Iteration", values_to = "N")
-names(soapN_hot) <- paste0("Iteration_", 1:10)
+soapN$Year <- 1:21
+soapN <- pivot_longer(soapN, cols = paste0("Iteration_", 1:50), names_to = "Iteration", values_to = "N")
+names(soapN_hot) <- paste0("Iteration_", 1:50)
 soapN_hot$meanN <- apply(soapN_hot, MARGIN = 1, FUN = mean )
 soapN_hot$Population <- "Soapstone"
 soapN_hot$Climate <- "hot/dry"
-soapN_hot$Year <- 1:101
-soapN_hot <- pivot_longer(soapN_hot, cols = paste0("Iteration_", 1:10), names_to = "Iteration", values_to = "N")
-names(baseN) <- paste0("Iteration_", 1:10)
+soapN_hot$Year <- 1:21
+soapN_hot <- pivot_longer(soapN_hot, cols = paste0("Iteration_", 1:50), names_to = "Iteration", values_to = "N")
+names(baseN) <- paste0("Iteration_", 1:50)
 baseN$meanN <- apply(baseN, MARGIN = 1, FUN = mean )
 baseN$Population <- "FEWAFB"
 baseN$Climate <- "Reference"
-baseN$Year <- 1:101
-baseN <- pivot_longer(baseN, cols = paste0("Iteration_", 1:10), names_to = "Iteration", values_to = "N")
-names(baseN_hot) <- paste0("Iteration_", 1:10)
+baseN$Year <- 1:21
+baseN <- pivot_longer(baseN, cols = paste0("Iteration_", 1:50), names_to = "Iteration", values_to = "N")
+names(baseN_hot) <- paste0("Iteration_", 1:50)
 baseN_hot$meanN <- apply(baseN_hot, MARGIN = 1, FUN = mean )
 baseN_hot$Population <- "FEWAFB"
 baseN_hot$Climate <- "hot/dry"
-baseN_hot$Year <- 1:101
-baseN_hot <- pivot_longer(baseN_hot, cols = paste0("Iteration_", 1:10), names_to = "Iteration", values_to = "N")
+baseN_hot$Year <- 1:21
+baseN_hot <- pivot_longer(baseN_hot, cols = paste0("Iteration_", 1:50), names_to = "Iteration", values_to = "N")
 
 datN <- rbind(soapN, soapN_hot, baseN, baseN_hot)
 datN$meanFinalN <- c(rep(soapN_tot, length.out = nrow(soapN)), 
                      rep(soapN_hot_tot, length.out = nrow(soapN_hot)),
                      rep(baseN_tot, length.out = nrow(baseN)),
                      rep(baseN_hot_tot, length.out = nrow(baseN_hot)))
+datN <- datN[datN$Year %in% c(1:21),]
 
 popSizeFig <- ggplot(datN) +
   geom_line(aes(x = Year, y = N, col = Climate, lty = Iteration), alpha = 0.2) + 
   geom_line(aes(x = Year, y = meanN, col = Climate)) +
-  facet_wrap(.~Population) +
-  xlim(c(0,50)) +
-  scale_linetype_manual(guide = "none", values = rep(1, length.out = 10)) +
+  facet_wrap(.~Population, scales = "free_y") +
+  xlim(c(0,21)) +
+  #ylim(c(0, 1500)) +
+  scale_linetype_manual(guide = "none", values = rep(1, length.out = 50)) +
+  #scale_color_manual(guide = "none") +
   ylab("Population Size") +
   theme_classic()
 

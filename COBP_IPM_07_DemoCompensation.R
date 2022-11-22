@@ -84,7 +84,6 @@ numNegSd <- sd(numNegCorrs)
 # the number of negative correlations in the actual data is 5 (for tMean_grow)
 pnorm(q = 5, mean = numNegMean, sd = numNegSd)
 
-
 #### fit IMPs #### 
 # use parameters in the 'dc_mods' d.f
 # vital rate functions

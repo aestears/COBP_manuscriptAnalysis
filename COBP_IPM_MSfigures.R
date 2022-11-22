@@ -5,6 +5,7 @@
 #/////////////////////////
 library(tidyverse)
 library(ggpubr)
+library(leaflet)
 
 #### figure of vital rates (all data, DI, all transitions) ####
 datSoap <- dat_all[dat_all$Location=="Soapstone",]
@@ -128,6 +129,7 @@ ggpubr::ggarrange(survFig, sizeFig, flwrFig, seedFig, align = "hv",
 
 #### figure of IPM matrix (all data, DI, all transitions) ####
 # matrices are called 'mat_all_Soap' and 'mat_all_Base'
+# "mat_all_DI" is from script 04
 image(t(mat_all_DI)^.1)
 
 #ipmr model 
@@ -172,7 +174,7 @@ contour(x = meshpts, y = meshpts,
 par(mar = c(2,3,1,1))
 image(contSeedlings_IPM$sub_kernels$seedbank_to_seedbank^.2, xaxt = "n", yaxt = "n", 
       col = pal[(contSeedlings_IPM$sub_kernels$seedbank_to_seedbank^.2)*100]) 
-mtext(side = 1, text  = c(0.94), line = -1, cex = .75)
+mtext(side = 1, text  = c(0.71), line = -1, cex = .75)
 ## seedbank to continuous
 par(mar = c(2,3,1,3))
 image((
@@ -298,6 +300,7 @@ mtext(side = 1, c("Current Year (t)"), xpd = NA, cex = 1, font = 2, line = .75)
 dev.off()
 
 
+# density dependence figs -------------------------------------------------
 siteDI_bootLambdas <- readRDS("~/Dropbox/Grad School/Research/Oenothera coloradensis project/COBP_analysis/intermediate_analysis_Data/site_level_IPMs_allYears/site_level_DI_bootCI_lambdas.RDS")
 # get mean lambda for each subpop
 names(siteDI_bootLambdas) <- unique(dat_all$Site)
@@ -307,7 +310,7 @@ mean <- sapply(siteDI_bootLambdas, mean)
 allDI_CI <- 
   c((mean - 1.96*SE),(mean + 1.96*SE))
 
-log(sapply(siteDI_mats, function(x) eigen(x)$values[1]))
+#log(sapply(siteDI_mats, function(x) eigen(x)$values[1]))
 
 siteDD_bootLambdas <- readRDS("~/Dropbox/Grad School/Research/Oenothera coloradensis project/COBP_analysis/intermediate_analysis_Data/site_level_IPMs_allYears/site_level_DD_bootCI_lambdas.RDS")
 names(siteDD_bootLambdas) <- unique(dat_all$Site)
@@ -318,5 +321,9 @@ allDI_CI <-
   c((mean - 1.96*SE),(mean + 1.96*SE))
 ## something is very wierd about the CI's for DD Models... redo? double check? 
 
-log(sapply(siteDD_mats, function(x) eigen(x)$values[1]))
+# log(sapply(siteDD_mats, function(x) eigen(x)$values[1]))
+
+
+# figure of specices location ---------------------------------------------
+leaflet()
 
