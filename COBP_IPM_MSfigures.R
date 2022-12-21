@@ -6,6 +6,11 @@
 library(tidyverse)
 library(ggpubr)
 library(leaflet)
+library(sf)
+library(mapedit)
+library(ggmap)
+library(ggspatial)
+library(ggrepel)
 
 #### figure of vital rates (all data, DI, all transitions) ####
 datSoap <- dat_all[dat_all$Location=="Soapstone",]
@@ -324,6 +329,179 @@ allDI_CI <-
 # log(sapply(siteDD_mats, function(x) eigen(x)$values[1]))
 
 
-# figure of specices location ---------------------------------------------
-leaflet()
+# figure of location of plots + species range ---------------------------------------------
+# load data 
+setwd("/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/Raw Data")
+sites <- read.csv("./COBP Plot Locations.csv", stringsAsFactors = FALSE)
 
+#order the sites in alphabetical order by site name 
+sites$site_2 <- str_sub(sites$Site, start = str_locate(sites$Site, " ")[,1]+1, end = str_length(sites$Site)) #make a new variable that shows just the site name (without the location)
+sites <- sites[order(sites$site_2),]
+sites_NoSeed <- sites %>% 
+  filter(site_2 != "Seed")
+
+sites_NoSeed <- st_as_sf(sites_NoSeed, coords = c("Long_WGS84","Lat_WGS84"))
+# get centroid for each subpopulation
+sites_NoSeed$population <- str_sub(sites_NoSeed$Site , start = 1, end = str_locate(sites_NoSeed$Site, pattern = " ")[,1]-1)
+sites_NoSeed <- st_as_sf(sites_NoSeed)
+st_crs(sites_NoSeed) <- 4326
+
+for (i in unique(sites_NoSeed$site_2)) {
+  if (i == "Crow Creek") {
+    sites_centroids <- sites_NoSeed[sites_NoSeed$site_2 == i,][1,]
+    sites_centroids$geometry <- 
+      st_centroid(st_union(sites_NoSeed[sites_NoSeed$site_2 == i,]))
+    } else {
+      temp <- sites_NoSeed[sites_NoSeed$site_2 == i,][1,]
+      temp$geometry <- 
+        st_centroid(st_union(sites_NoSeed[sites_NoSeed$site_2 == i,]))
+      sites_centroids <- rbind(sites_centroids, 
+          temp)
+  }
+}
+
+for (i in unique(sites_NoSeed$population)) {
+  if (i == "FEWAFB") {
+    sites_pops <- sites_NoSeed[sites_NoSeed$population == i,][1,]
+    sites_pops$geometry <- 
+      st_centroid(st_union(sites_NoSeed[sites_NoSeed$population == i,]))
+  } else {
+    temp <- sites_NoSeed[sites_NoSeed$population == i,][1,]
+    temp$geometry <- 
+      st_centroid(st_union(sites_NoSeed[sites_NoSeed$population == i,]))
+    sites_pops <- rbind(sites_pops, 
+                             temp)
+  }
+}
+st_crs(sites_pops) <- 4326
+
+## make a map of the distribution (present and historical) using mapedit package
+# distMap <- mapview(sites_centroids)  %>% 
+#   editMap()
+# distMap_tempGeom <- distMap$finished
+# distMap_tempTemp <- mapview(distMap_tempGeom) %>% 
+#   editMap()
+# distMap_final <- rbind(distMap_tempTemp$all, distMap_tempGeom)
+# distMap_final$distType <- c("historical", "current", "historical", "current", "historical")
+# # distMap_final <- st_make_valid(distMap_final)
+# saveRDS(distMap_final, file = "../Raw Data/SpatialDistributionMap")
+
+# define the palette for each subpopulation (plot)
+pal <- colorFactor(
+  palette = "Dark2",
+  domain = sites$site_2)
+# define the palette for each subpopulation 
+pal_subPop <- colorFactor(
+  palette = "Dark2",
+  domain = sites_centroids$site_2)
+pal_dist <- colorFactor(
+  palette = "Spectral", 
+  domain = distMap_final$distType
+)
+
+## map of species distributions and population locations
+# leaflet()  %>% 
+#   addProviderTiles(providers$Esri.WorldImagery) %>% 
+#   addPolygons(data = distMap_final[distMap_final$distType == "historical",], color = "black", weight = 1, opacity = 1, fillOpacity = .5, fillColor = "#95b1c0") %>%
+#   addPolygons(data = distMap_final[distMap_final$distType == "current",], color = "black", weight = 1, opacity = 1, fillOpacity = .7, fillColor = "#2B6482") %>%
+#   #addCircles(data = sites_centroids, col = "black", radius = 600, opacity = .7, weight = 1, fillColor = ~pal_subPop(sites_centroids$site_2), fillOpacity = .7) %>%
+#   addCircles(data = sites_pops, col = "black", radius = 2000, opacity = 1, weight = 1, fillColor = "black", fillOpacity = 1) %>% 
+#   addLabelOnlyMarkers(lat = st_coordinates(sites_pops[1,])[2], 
+#                       lng = st_coordinates(sites_pops[1,])[1],
+#                       label = "FEWAFB", labelOptions = list(permanent = TRUE)) %>%
+#   addLabelOnlyMarkers(lat = st_coordinates(sites_pops[2,])[2], 
+#                       lng = st_coordinates(sites_pops[2,])[1],
+#                       label = "Soapstone Prairie", labelOptions = list(permanent = TRUE, direction = "bottom")) %>% 
+#   addLegend(position = "bottomright", colors = c("#2B6482", "#95b1c0"), labels = c("Current", "Historical"), title = "Species Distribution") %>% 
+#   addScaleBar(position = "bottomright")
+
+## ggmap version
+dist_bbox <- st_bbox(st_buffer(st_union(distMap_final),10000))
+names(dist_bbox) <- c("left", "bottom", "right", "top")
+terrain_basemap <- get_map(
+  location=dist_bbox, 
+  zoom = 10,
+  maptype = 'terrain-background', 
+  source = 'stamen')
+
+ggmap(terrain_basemap) + 
+  geom_sf(data = distMap_final, 
+          aes(fill = distType), 
+          alpha = .8,
+          inherit.aes = FALSE) +
+  scale_fill_manual(values =  c("#2B6482", "#95b1c0"), 
+                     name = "Species \n Distribution") + 
+  geom_sf(data = sites_pops, aes(), inherit.aes = FALSE) + 
+  geom_label_repel(inherit.aes = FALSE, 
+                   data = sites_pops, 
+                   aes(x = st_coordinates(sites_pops)[,1],
+                                                              y = st_coordinates(sites_pops)[,2],
+                                                              label = population)) + 
+  xlab("") + 
+  ylab("") + 
+  annotation_scale(data = sites_NoSeed[sites_NoSeed$population == "FEWAFB",])
+
+
+## map of plot locations (FEWAFB)
+FEWAFB_bbox <- st_bbox(st_buffer(sites_NoSeed[sites_NoSeed$population == "FEWAFB",],1000))
+names(FEWAFB_bbox) <- c("left", "bottom", "right", "top")
+terrain_basemap <- get_map(
+  location=FEWAFB_bbox, 
+  zoom = 14,
+  maptype = 'terrain-background', 
+  source = 'stamen')
+
+ggmap(terrain_basemap) + 
+  geom_sf(data = sites_NoSeed[sites_NoSeed$population == "FEWAFB",], 
+          aes(col = site_2), 
+          inherit.aes = FALSE) +
+  scale_color_manual(values = pal(unique(sites_NoSeed$site_2))[c(1,2,6)], 
+                     name = "Subpopulation") + 
+  xlim(c(-104.885, -104.869)) + 
+  ylim(c(41.135, 41.156)) + 
+  xlab("") + 
+  ylab("") + 
+  annotation_scale(data = sites_NoSeed[sites_NoSeed$population == "FEWAFB",]) + 
+  theme(axis.ticks = element_blank(), 
+        axis.text = element_blank())
+
+## map of plot locations (Soapstone)
+Soapstone_bbox <- st_bbox(st_buffer(sites_NoSeed[sites_NoSeed$population == "Soapstone",],500))
+names(Soapstone_bbox) <- c("left", "bottom", "right", "top")
+terrain_basemap <- get_map(
+  location=Soapstone_bbox, 
+  zoom = 12,
+  maptype = 'terrain-background', 
+  source = 'stamen')
+
+ggmap(terrain_basemap) + 
+  geom_sf(data = sites_NoSeed[sites_NoSeed$population == "Soapstone",], 
+          aes(col = site_2), 
+          inherit.aes = FALSE) +
+  scale_color_manual(values = pal(unique(sites_NoSeed$site_2))[c(3,4,5)], 
+                     name = "Subpopulation") + 
+  xlim(c(-105.023, -105.008)) + 
+  ylim(c(40.985, 40.995)) + 
+  xlab("") + 
+  ylab("") + 
+  annotation_scale(data = sites_NoSeed[sites_NoSeed$population == "FEWAFB",]) + 
+  theme(axis.ticks = element_blank(), 
+        axis.text = element_blank())
+
+
+# sample size calculations for Table S1 -------------------------------------
+adult_seed_n <- dat_all %>% 
+  group_by(Site, seedling, Year) %>% 
+  summarize(n = sum(survives_t))
+
+all_n <- dat_all %>% 
+  group_by(Site,  Year) %>% 
+  summarize(n = n())
+
+
+seedlings_cont %>% 
+  group_by(Site, Year) %>% 
+  summarize(n = sum(seedling))
+seedlings %>% 
+  group_by(Site, Year) %>% 
+  summarize(n = sum(Seedlings_t))

@@ -51,7 +51,7 @@ set.seed(12011993)
 sizes <- runif(4425, min = 0.1, max = 3) # sample from a dist. skewed to the right, partially b/c I can't get the model to run without it, and partially b/c the seedlings actually were more likely to be larger (is multiplied by 3, since we want size to range from 0 to 3)
 seedlings_long$LongestLeaf_cm = sizes
 
-# because we know the number of indivdiuals that were 'recruited' into the adult plant stage, we can estimate the number of seedlings that survive in each quadrat. We will randomly assign the these 'new recruits' to a seedling 
+# because we know the number of individuals that were 'recruited' into the adult plant stage in each t+1, we can estimate the number of seedlings that survived from t in each quadrat. We will randomly assign the these 'new recruits' to a seedling 
 # get the data for 'recruits' to the adult stage
 recruitsTemp <- dat[dat$recruit == 1,]
 # loop through by quadrat/year
