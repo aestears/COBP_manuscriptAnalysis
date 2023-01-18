@@ -10,8 +10,8 @@ library(lme4)
 library(MASS)
 #### load data from the previous script ####
 # (COBP_IPM_01_dataPrep.R)
-# source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
-dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
+source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
+# dat_all <- read.csv(file = "~/Dropbox/Grad School/Research/Oenothera coloradensis project/Processed_Data/allDat_plus_contSeedlings.csv")
 
 #### Vital Rate Models for Deterministic, non-density-dependent IPM with all data + continuous seedlings####
 ## the dataset is called 'dat_all'
@@ -184,7 +184,7 @@ dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
  # viab.rt * germ.rt
  goCont_all <- viab.rt * germ.rt
 
- #### Models by site (no env. co-variates, CONTINUOUS SEEDLINGS- DI) ####
+ #### Models by site (no env. co-variates, density independent, all data + continuous seedlings) ####
  ### Make vital rate models (put inside a for-loop; store models in a list)
  # make an empty list to hold models
  det_DI_mods <- list()
@@ -236,7 +236,7 @@ dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
  }
  ## use uniform p.estab, outSB, staySB, and goSB estimates
  
- #### Models by site (no env covariates, CONTINUOUS SEEDLINGS - DD) ####
+ #### Models by site (no env covariates, density dependent, with continuous seedlings) ####
  ### Make vital rate models (put inside a for-loop; store models in a list)
  # make an empty list to hold models
  det_DD_mods <- list()
@@ -355,20 +355,20 @@ recMod_second <- lm(log_LL_t ~ 1, data = recD_second)
 ## Survival ($s(z)$)
 # data: survDat
 # logistic glm with log-transformed size_t
-survMod_e <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = survDat, family = binomial)
+survMod_e <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = survDat_all, family = binomial)
 summary(survMod_e)
 # try excluding the precip data (is not significant in the previous model)
-survMod_e_1 <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_grow_C_s + tMean_grow_C_s + (1|Plot_ID),  data = survDat, family = binomial)
+survMod_e_1 <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_grow_C_s + tMean_grow_C_s + (1|Plot_ID),  data = survDat_all, family = binomial)
 summary(survMod_e_1)
 ## survMod_e_1 is the better fit, use this model
 survMod_env <- survMod_e_1
 
 ## Growth ($G(z',z)$)
 # lm w/ log-transformed size_t and size_t+1
-sizeMod_e <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + precipWaterYr_cm_s + tMean_grow_C_s +  (1|Plot_ID), data = dat)
+sizeMod_e <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + precipWaterYr_cm_s + tMean_grow_C_s +  (1|Plot_ID), data = dat_all)
 summary(sizeMod_e)
 # remove soilTemp in winter and growing season
-sizeMod_e_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = dat)
+sizeMod_e_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = dat_all)
 summary(sizeMod_e_1)
 sizeMod_env <- sizeMod_e_1
 
@@ -377,17 +377,17 @@ sizeMod_env <- sizeMod_e_1
 # use only plants that flowered 
 # dat: seedDat
 # fit poisson glm (for count data)
-seedMod_e <- lme4::glmer.nb(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = seedDat)
+seedMod_e <- lme4::glmer.nb(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = seedDat_all)
 summary(seedMod_e)
 # remove soil moisture, soil temp grow, soil temp winter (not significant)
-seedMod_e_1 <- lme4::glmer.nb(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID) , data = seedDat, family = poisson)
+seedMod_e_1 <- lme4::glmer.nb(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID) , data = seedDat_all, family = poisson)
 summary(seedMod_e_1)
 seedMod_env <- seedMod_e_1
 
 ## Flowering probability ($p_b(z)$)
 # using size in current year (w/ squared term)
 # logistic glm with log-transformed size_t
-flwrMod_e <- glmer(flowering ~ log_LL_t + I(log_LL_t^2) + SoilMoisture_m3m3_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = dat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+flwrMod_e <- glmer(flowering ~ log_LL_t + I(log_LL_t^2) + SoilMoisture_m3m3_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID), data = dat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(flwrMod_e)
 flwrMod_env <- flwrMod_e
 
@@ -395,7 +395,7 @@ flwrMod_env <- flwrMod_e
 # subset the data
 # data: recD 
 # fit the model
-recMod_env <- lmer(log_LL_t ~ SoilMoisture_m3m3_s + (1|Plot_ID), data = recD)
+recMod_env <- lmer(log_LL_t ~ SoilMoisture_m3m3_s + (1|Plot_ID), data = recD_all)
 summary(recMod_env)
 #plot the results
 
@@ -416,33 +416,33 @@ summary(recMod_env)
 
 #### Vital Rate Models for the Stochastic, density-dependent IPM for all data with random effect for site and environmental covariates ####
 ## Survival ($s(z)$)
-# data: survDat 
+# data: survDat_all
 dat$log_LL_t_s <- scale(dat$log_LL_t)
 # logistic glm with log-transformed size_t
-survMod_e_dd <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_t + (1|Plot_ID), data = survDat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+survMod_e_dd <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_t + (1|Plot_ID), data = survDat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(survMod_e_dd)
 # try excluding the precip data (is not significant in the previous model)
-survMod_e_dd_1 <- glmer(survives_tplus1 ~ log_LL_t + tMean_grow_C_s + N_all_t +  (1|Plot_ID),  data = survDat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+survMod_e_dd_1 <- glmer(survives_tplus1 ~ log_LL_t + tMean_grow_C_s + N_all_t +  (1|Plot_ID),  data = survDat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(survMod_e_dd_1)
 ## survMod_e_1 is the better fit, use this model
 survMod_env_dd <- survMod_e_dd_1
 
 ## Growth ($G(z',z)$)
 # lm w/ log-transformed size_t and size_t+1
-sizeMod_e_dd <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_t + (1|Plot_ID), data = dat)
+sizeMod_e_dd <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_t + (1|Plot_ID), data = dat_all)
 summary(sizeMod_e_dd)
 # remove soilTemp in winter and growing season; drop precip
-sizeMod_e_dd_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + N_all_t + (1|Plot_ID), data = dat)
+sizeMod_e_dd_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + N_all_t + (1|Plot_ID), data = dat_all)
 summary(sizeMod_e_dd_1)
 sizeMod_env_dd <- sizeMod_e_dd_1
 
 ## Number of seeds produced, according to plant size ($b(z)$)
 # data: seedDat 
 # fit poisson glm (for count data)
-seedMod_e_dd <- lme4::glmer.nb(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s +  N_all_t + (1|Plot_ID), data = seedDat, family = poisson)
+seedMod_e_dd <- lme4::glmer.nb(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s +  N_all_t + (1|Plot_ID), data = seedDat_all, family = poisson)
 summary(seedMod_e_dd)
 # remove soil moisture, soil temp grow, soil temp winter (not significant)
-seedMod_e_dd_1 <- lme4::glmer.nb(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID) , data = seedDat, family = poisson)
+seedMod_e_dd_1 <- lme4::glmer.nb(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID) , data = seedDat_all, family = poisson)
 summary(seedMod_e_dd_1)
 ## use the final model w/ no density dependence
 seedMod_env_dd <- seedMod_e_dd_1
@@ -450,10 +450,10 @@ seedMod_env_dd <- seedMod_e_dd_1
 ## Flowering probability ($p_b(z)$)
 # using size in current year (w/ squared term)
 # logistic glm with log-transformed size_t
-flwrMod_e_dd <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  +  N_all_t + (1|Plot_ID), data = dat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+flwrMod_e_dd <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  +  N_all_t + (1|Plot_ID), data = dat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(flwrMod_e_dd)
 # remove density dependence
-flwrMod_e_dd_1 <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  + (1|Plot_ID), data = dat, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+flwrMod_e_dd_1 <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  + (1|Plot_ID), data = dat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(flwrMod_e_dd_1)
 # final model has no density dependence
 flwrMod_env_dd <- flwrMod_e_dd
@@ -461,7 +461,7 @@ flwrMod_env_dd <- flwrMod_e_dd
 ## Distribution of recruit size ($c_o(z')$)
 # data = recD
 # fit the model
-recMod_env_dd <- lmer(log_LL_t ~ SoilMoisture_m3m3_s + N_all_t + (1|Plot_ID), data = recD)
+recMod_env_dd <- lmer(log_LL_t ~ SoilMoisture_m3m3_s + N_all_t + (1|Plot_ID), data = recD_all)
 summary(recMod_env_dd)
 #plot the results
 
@@ -486,7 +486,7 @@ summary(recMod_env_dd)
 det_DI_mods <- list()
 det_DI_mods[1:6] <- NA
 # make a vector of site names
-siteNames <- unique(dat$Site)
+siteNames <- unique(dat_all$Site)
 # start for-loop to fit models
 for (i in 1:length(siteNames)) {
   # make a list to hold models for this site
@@ -497,21 +497,21 @@ for (i in 1:length(siteNames)) {
   
   ## fit survival model
   # get data only for plants that didn't flower
-  survDat_now <- dat[dat$flowering==0 | is.na(dat$flowering) & 
-                       dat$Site == site_now,]
+  survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
+                       dat_all$Site == site_now,]
   # fit model and store in list
   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t , data = survDat_now, family = binomial)
   names(temp_mod_list)[1] <- paste0("surv")
   
   ## fit growth model
   # get all data, but just for this site
-  allDat_now <- dat[dat$Site == site_now,]
+  allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t , data = allDat_now)
   names(temp_mod_list)[2] <- paste0("growth")
   
   ## number of seeds produced, according to plant size
-  seedDat_now <- dat[dat$flowering == 1 & dat$Site == site_now,]
+  seedDat_now <- dat_all[dat_all$flowering == 1 & dat_all$Site == site_now,]
   # fit the model and store it
   temp_mod_list[[3]] <- glm(Num_seeds ~ log_LL_t , data = seedDat_now, family = poisson)
   names(temp_mod_list)[3] <- paste0("seedProduction")
@@ -521,8 +521,8 @@ for (i in 1:length(siteNames)) {
   names(temp_mod_list)[4] <- paste0("flowering")
   
   ## distribution of recruit size
-  recD_now <- dat[dat$age == 0 & is.na(dat$age) == FALSE & 
-                    dat$Site == site_now,]
+  recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
+                    dat_all$Site == site_now,]
   temp_mod_list[[5]] <- lm(log_LL_t ~ 1, data = recD_now)
   names(temp_mod_list)[5] <- paste0("recruitDist")
   
@@ -538,7 +538,7 @@ for (i in 1:length(siteNames)) {
 det_DD_mods <- list()
 det_DD_mods[1:6] <- NA
 # make a vector of site names
-siteNames <- unique(dat$Site)
+siteNames <- unique(dat_all$Site)
 # start for-loop to fit models
 for (i in 1:length(siteNames)) {
   # make a list to hold models for this site
@@ -549,21 +549,21 @@ for (i in 1:length(siteNames)) {
   
   ## fit survival model
   # get data only for plants that didn't flower
-  survDat_now <- dat[dat$flowering==0 | is.na(dat$flowering) & 
-                       dat$Site == site_now,]
+  survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
+                       dat_all$Site == site_now,]
   # fit model and store in list
   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + N_all_t, data = survDat_now, family = binomial)
   names(temp_mod_list)[1] <- paste0("surv")
   
   ## fit growth model
   # get all data, but just for this site
-  allDat_now <- dat[dat$Site == site_now,]
+  allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + N_all_t, data = allDat_now)
   names(temp_mod_list)[2] <- paste0("growth")
   
   ## number of seeds produced, according to plant size
-  seedDat_now <- dat[dat$flowering == 1 & dat$Site == site_now,]
+  seedDat_now <- dat_all[dat_all$flowering == 1 & dat_all$Site == site_now,]
   # fit the model and store it
   temp_mod_list[[3]] <- glm(Num_seeds ~ log_LL_t , data = seedDat_now, family = poisson)
   names(temp_mod_list)[3] <- paste0("seedProduction")
@@ -573,8 +573,8 @@ for (i in 1:length(siteNames)) {
   names(temp_mod_list)[4] <- paste0("flowering")
   
   ## distribution of recruit size
-  recD_now <- dat[dat$age == 0 & is.na(dat$age) == FALSE & 
-                    dat$Site == site_now,]
+  recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
+                    dat_all$Site == site_now,]
   temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + N_all_t, data = recD_now)
   names(temp_mod_list)[5] <- paste0("recruitDist")
   
@@ -591,7 +591,7 @@ for (i in 1:length(siteNames)) {
 stoch_DI_mods <- list()
 stoch_DI_mods[1:6] <- NA
 # make a vector of site names
-siteNames <- unique(dat$Site)
+siteNames <- unique(dat_all$Site)
 # start for-loop to fit models
 for (i in 1:length(siteNames)) {
   # make a list to hold models for this site
@@ -602,8 +602,8 @@ for (i in 1:length(siteNames)) {
   
   ## fit survival model
   # get data only for plants that didn't flower
-  survDat_now <- dat[dat$flowering==0 | is.na(dat$flowering) & 
-                       dat$Site == site_now,]
+  survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
+                       dat_all$Site == site_now,]
   # fit model and store in list
   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + tMean_grow_C_s +  
                               SoilTemp_grow_C_s , 
@@ -613,14 +613,14 @@ for (i in 1:length(siteNames)) {
   
   ## fit growth model
   # get all data, but just for this site
-  allDat_now <- dat[dat$Site == site_now,]
+  allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + tMean_grow_C_s , 
                            data = allDat_now)
   names(temp_mod_list)[2] <- paste0("growth")
   
   ## number of seeds produced, according to plant size
-  seedDat_now <- dat[dat$flowering == 1 & dat$Site == site_now,]
+  seedDat_now <- dat_all[dat_all$flowering == 1 & dat_all$Site == site_now,]
   # fit the model and store it
   temp_mod_list[[3]] <- glm(Num_seeds ~ log_LL_t + tMean_grow_C_s , 
                             data = seedDat_now, 
@@ -634,8 +634,8 @@ for (i in 1:length(siteNames)) {
   names(temp_mod_list)[4] <- paste0("flowering")
   
   ## distribution of recruit size
-  recD_now <- dat[dat$age == 0 & is.na(dat$age) == FALSE & 
-                    dat$Site == site_now,]
+  recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
+                    dat_all$Site == site_now,]
   temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + SoilMoisture_m3m3_s, data = recD_now)
   names(temp_mod_list)[5] <- paste0("recruitDist")
   
@@ -652,7 +652,7 @@ for (i in 1:length(siteNames)) {
 stoch_DD_mods <- list()
 stoch_DD_mods[1:6] <- NA
 # make a vector of site names
-siteNames <- unique(dat$Site)
+siteNames <- unique(dat_all$Site)
 # start for-loop to fit models
 for (i in 1:length(siteNames)) {
   # make a list to hold models for this site
@@ -663,8 +663,8 @@ for (i in 1:length(siteNames)) {
   
   ## fit survival model
   # get data only for plants that didn't flower
-  survDat_now <- dat[dat$flowering==0 | is.na(dat$flowering) & 
-                       dat$Site == site_now,]
+  survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
+                       dat_all$Site == site_now,]
   # fit model and store in list
   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + tMean_grow_C_s +  
                               SoilTemp_grow_C_s + N_all_t, 
@@ -674,7 +674,7 @@ for (i in 1:length(siteNames)) {
   
   ## fit growth model
   # get all data, but just for this site
-  allDat_now <- dat[dat$Site == site_now,]
+  allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + tMean_grow_C_s +  
                               N_all_t, 
@@ -682,7 +682,7 @@ for (i in 1:length(siteNames)) {
   names(temp_mod_list)[2] <- paste0("growth")
   
   ## number of seeds produced, according to plant size
-  seedDat_now <- dat[dat$flowering == 1 & dat$Site == site_now,]
+  seedDat_now <- dat_all[dat_all$flowering == 1 & dat_all$Site == site_now,]
   # fit the model and store it
   temp_mod_list[[3]] <- glm(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s , 
                             data = seedDat_now, 
@@ -696,8 +696,8 @@ for (i in 1:length(siteNames)) {
   names(temp_mod_list)[4] <- paste0("flowering")
   
   ## distribution of recruit size
-  recD_now <- dat[dat$age == 0 & is.na(dat$age) == FALSE & 
-                    dat$Site == site_now,]
+  recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
+                    dat_all$Site == site_now,]
   temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + SoilMoisture_m3m3_s + N_all_t, data = recD_now)
   names(temp_mod_list)[5] <- paste0("recruitDist")
   
@@ -727,18 +727,19 @@ newdata <- data.frame("N_Site_t" = seq(from = min(N_dat$N_Site_t, na.rm = TRUE),
                                        length.out = 100))
 lines(x = newdata$N_Site_t, y = predict(object = dd_nb.mod, newdata =  newdata, type = "response"), col = "red")
 
-census <- read.csv("/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/Raw Data/fewafb_SiteCensus_2021.csv", header = TRUE)
-names(census) <- c("Site", 2002:2021)
-census <- census %>% 
-  pivot_longer(cols = names(census)[2:21], names_to = "Year", values_to = "N_t")
-census$N_tplus1 <- NA
-for(i in unique(census$Site)) {
-  census[census$Site == i,"N_tplus1"] <-  c(census[census$Site == i,]$N_t[2:20], NA)
-}
-ddCensus_nb.mod <- MASS::glm.nb(N_tplus1 ~ N_t + Site, dat = census)
-plot(x = census$N_t, y = census$N_tplus1)
-newdata <- data.frame("N_t" = seq(from = min(census$N_t, na.rm = TRUE), 
-                                       to = max(census$N_t, na.rm = TRUE),
-                                       length.out = 100),
-                      "Site" = "Diamond")
-lines(x = newdata$N_t, y = predict(object = ddCensus_nb.mod, newdata =  newdata, type = "response"), col = "red")
+# 
+# census <- read.csv("~/Dropbox/Grad School/Research/Oenothera coloradensis project/Raw Data/fewafb_SiteCensus_2021.csv", header = TRUE)
+# names(census) <- c("Site", 2002:2021)
+# census <- census %>% 
+#   pivot_longer(cols = names(census)[2:21], names_to = "Year", values_to = "N_t")
+# census$N_tplus1 <- NA
+# for(i in unique(census$Site)) {
+#   census[census$Site == i,"N_tplus1"] <-  c(census[census$Site == i,]$N_t[2:20], NA)
+# }
+# ddCensus_nb.mod <- MASS::glm.nb(N_tplus1 ~ N_t + Site, dat = census)
+# plot(x = census$N_t, y = census$N_tplus1)
+# newdata <- data.frame("N_t" = seq(from = min(census$N_t, na.rm = TRUE), 
+#                                        to = max(census$N_t, na.rm = TRUE),
+#                                        length.out = 100),
+#                       "Site" = "Diamond")
+# lines(x = newdata$N_t, y = predict(object = ddCensus_nb.mod, newdata =  newdata, type = "response"), col = "red")

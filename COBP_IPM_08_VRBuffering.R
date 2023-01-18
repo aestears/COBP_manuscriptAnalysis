@@ -130,6 +130,7 @@ discParamElas <- readRDS("./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv
 contParamElas <- contParamElas[match(c("growth_(Intercept)", "growth_log_LL_t", "growth_stndDev", "survival_(Intercept)", "survival_log_LL_t","flowering_(Intercept)", "flowering_log_LL_t", "flowering_I(log_LL_t^2)","seedProduction_(Intercept)", "seedProduction_log_LL_t", "recruitDist_(Intercept)", "recruitDist_stndDev"), contParamElas$param_name),] 
 ## put elasticity in the vrDF
 vrDF$Elas <- contParamElas$elas_mean
+vrDF$Sens <- contParamElas$sens_mean
 
 ## add data for sb params? 
 # vrDF[13,"mean"] <- mean(c(13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
@@ -145,6 +146,8 @@ rownames(vrDF[13:15,]) <- c("germ.rt", "surv.rt", "viab.rt")
 vrDF[13:15,"quarDisp"] <- c(.75-.25)/(.75+.25)
 
 vrDF[13:15,"Elas"] <- discParamElas$elas_mean
+vrDF[13:15, "Sens"] <- discParamElas$sens_mean
+
 # vrDF$CV <- vrDF$sd/vrDF$mean * 100
 #### calculate the correlation between CV and elasticity ####
 cor.test((vrDF$quarDisp[c(1:3,5:12)]), abs(vrDF$Elas[c(1:3,5:12)]), method = "pearson")

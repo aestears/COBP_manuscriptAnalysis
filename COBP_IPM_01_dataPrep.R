@@ -9,11 +9,14 @@
 library(tidyverse)
 
 #### Load Data ####
+# location of data files 
+datFolder <- "/Users/alicestears/Dropbox/Grad School/Research/Oenothera coloradensis project"
 ## load continuous data
-dat <- read.csv("../Processed_Data/COBP_long_CURRENT.csv") 
+dat <- read.csv(paste0(datFolder, "/Processed_Data/COBP_long_CURRENT.csv"),
+                sep = ",") 
 
 ## get seedling data
-seedlings <- read.csv("../Raw Data/COBP_seedlings_8_23_21.csv") %>% 
+seedlings <- read.csv(paste0(datFolder, "/Raw Data/COBP_seedlings_8_23_21.csv"), sep = ",") %>% 
   dplyr::select(Plot_ID, Quadrant, Seedlings_18, Seedlings_19, Seedlings_20) %>% 
   group_by(Plot_ID, Quadrant) %>% 
   summarize(Seedlings_18 = sum(Seedlings_18), Seedlings_19 = sum(Seedlings_19), Seedlings_20 = sum(Seedlings_20)) %>% 
@@ -28,7 +31,7 @@ seedlings[seedlings$Plot_ID %in% c("S1", "S2", "S3"), "Site"] <- "HQ5"
 seedlings[seedlings$Plot_ID %in% c("S4", "S5", "S6"), "Site"] <- "HQ3"
 seedlings[seedlings$Plot_ID %in% c("S7", "S8", "S9"), "Site"] <- "Meadow"
 
-## make seedling data into 'continuous' data
+#### make seedling data into 'continuous' data ####
 # add the seedling data with each row representing a seedling
 for (i in 1:nrow(seedlings)) {
   seedlingNow <- seedlings[i,]
@@ -50,6 +53,21 @@ for (i in 1:nrow(seedlings)) {
 set.seed(12011993)
 sizes <- runif(4425, min = 0.1, max = 3) # sample from a dist. skewed to the right, partially b/c I can't get the model to run without it, and partially b/c the seedlings actually were more likely to be larger (is multiplied by 3, since we want size to range from 0 to 3)
 seedlings_long$LongestLeaf_cm = sizes
+
+# # try setting size according to a normal distribution
+# sizeTemp <- seq(from = 0.1, to = 3, by = .001)
+# sizes <- rnorm(n = 4425, mean = 1.55, sd = 0.5)
+# # truncate the sizes between .1 and 3 
+# sizes[which(sizes<.1)] <- 0.1
+# sizes[which(sizes>3)] <- 3
+# 
+# plot(density(rnorm(n = 4425, mean = 1.55, sd = 0.5)))
+# seedlings_long$LongestLeaf_NORM = sizes
+
+# try setting size according to a beta distributio
+sizes <- 3 * rbeta(n = 4425, shape1 = 3, shape2 = 1)
+
+seedlings_long$LongestLeaf_NORM = sizes
 
 # because we know the number of individuals that were 'recruited' into the adult plant stage in each t+1, we can estimate the number of seedlings that survived from t in each quadrat. We will randomly assign the these 'new recruits' to a seedling 
 # get the data for 'recruits' to the adult stage
@@ -96,8 +114,12 @@ for (i in 1:length(quads)) {
                            "seedling" = 1, "index" = NA, "Num_seeds" = NA, "log_LL_t" = NA, 
                            "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, 
                            "N_seedlings_t" = NA, "N_adults_t" = NA, 
-                           "N_all_t" = NA, "recruit" = NA)
+                           "N_all_t" = NA, "recruit" = NA, 
+                           "LongestLeaf_NORM" = rnorm(numNewSdlngs, mean = 1.55, sd = .5))
         
+        # truncate the estimated seedling sizes from the Normal distribution to between .1 and 3 
+        temp[temp$LongestLeaf_NORM<.1, "LongestLeaf_NORM"] <- 0.1
+        temp[temp$LongestLeaf_NORM>3, "LongestLeaf_NORM"] <- 3
         # then add this to the seedsNow d.f
         if (nrow(seedsNow) == 0) {
           seedsNow <- temp
@@ -126,12 +148,18 @@ seedlings_2020 <- seedlings_long[seedlings_long$Year==2020,]
 ## add to the 'seedlings_cont' df
 seedlings_cont <- rbind(seedlings_cont, seedlings_2020)
 
+### TEMPORARILY change the "seedlings_cont$longestLeaf_cm" data to have the 
+# seedling size information from a NORMAL DISTRIBUTION (rather than a UNIFORM DISTRIBUTION like it did before)
+seedlings_cont <- seedlings_cont %>% 
+  dplyr::select(-LongestLeaf_cm) %>% 
+  rename(LongestLeaf_cm = LongestLeaf_NORM)
+
 ## "seedlings_cont" contains the continuous seedling data
 # there are only values for 2018 and 2019, since we can't know whether seedlings from 2020 survived or not
 # make sure both dfs have the same column order
-dat <- dat[,names(seedlings_cont[,1:25])]
+dat_temp <- dat[,names(seedlings_cont[,c(1:24,29)])]
 # add seedlings_cont to the dat dataframe
-dat_all <- rbind(dat, seedlings_cont[,1:25])
+dat_all <- rbind(dat_temp, seedlings_cont[,c(1:24,29)])
 
 ## make sure that the "location" data in dat_all is correct
 dat_all[dat_all$Site %in% c("Crow_Creek", "Diamond_Creek", "Unnamed_Creek"),"Location"] <- "FEWAFB"
@@ -325,8 +353,8 @@ for (i in 1:length(plots)) {
       n_recruits_tplus1 <- 0
     }
     # get the number of seedlings in year t
-    n_seedlings_t <- deframe(seedlings[seedlings$Plot_ID == plot_now & 
-                                 seedlings$Year == year_now, "Seedlings_t"])
+    n_seedlings_t <- sum(deframe(seedlings[seedlings$Plot_ID == plot_now & 
+                                 seedlings$Year == year_now, "Seedlings_t"]))
     
     if (n_seedlings_t > n_recruits_tplus1) {
       seeds_now <- rbind(seeds_now, 

@@ -554,7 +554,7 @@ test <- param_fig_DIfirst %>%
   summarise("mean_value" = mean(value))
 param_fig <- left_join(param_fig_DIfirst, test)
 # plot the distribution of values
-ggplot(data = param_figDIfirst) + 
+ggplot(data = param_fig) + 
   geom_density(mapping = aes(value)) +
   geom_vline(aes(xintercept = mean_value, col = param)) + 
   geom_vline(aes(xintercept = 0), col = "grey", lty = 2) +
