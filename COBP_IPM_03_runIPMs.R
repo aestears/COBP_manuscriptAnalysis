@@ -480,249 +480,249 @@ plot(x = meshpts, y = preds, ylab = "Survival Probability", type = "l")
 # plot the survival values from the P matrix (column sums)
 points(meshpts,apply(contSeedlings_IPM$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
 
-#### Determinsitic, DI IPM for Base data ####
-data_list <- list(
-  g_int     = coef(sizeMod_Base)[1], # growth 
-  g_slope   = coef(sizeMod_Base)[2],
-  g_sd      = sd(residuals(sizeMod_Base)),
-  s_int     = coef(survMod_Base)[1], # survival
-  s_slope   = coef(survMod_Base)[2],
-  p_b_int   = coef(flwrMod_Base)[1], #probability of flowering
-  p_b_slope = coef(flwrMod_Base)[2],
-  p_b_slope_2 = coef(flwrMod_Base)[3],
-  b_int   = coef(seedMod_Base)[1], #seed production
-  b_slope = coef(seedMod_Base)[2],
-  c_o_mu    = coef(recMod_Base), #recruit size distribution
-  c_o_sd    = sd(residuals(recMod_Base)), 
-  outSB  = outSB_all,
-  staySB = staySB_all,
-  goSB   = goSB_all, 
-  goCont = goCont_all                  
-)
-
-# inital population state
-init_size_state <- runif(500)
-
-base_IPM <- init_ipm(sim_gen   = "general", 
-                          di_dd     = "di", 
-                          det_stoch = "det") %>% 
-  define_kernel(
-    name          = "P",
-    formula       =(1-p_b.) * s. * g. * d_size,
-    
-    s.            = 1/(1 + exp(-(s_int + s_slope * size_1))),
-    g.            = dnorm(size_2, g_mu., g_sd), 
-    g_mu.         = g_int + g_slope * size_1, 
-    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
-    
-    family        = "CC",
-    data_list     = data_list,
-    states        = list(c('size')),
-    uses_par_sets = FALSE,
-    evict_cor     = TRUE,
-    evict_fun     = truncated_distributions("norm", "g.")
-  ) %>% 
-  define_kernel(
-    name          = "F", 
-    formula       = goCont. * (p_b. * b. * c_o. * d_size),
-    
-    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
-    b.            = exp(b_int + b_slope * size_1),
-    c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
-    goCont.       = goCont,
-    
-    family        = "CC",
-    data_list     = data_list,
-    states        = list(c('size')),
-    uses_par_sets = FALSE,
-    evict_cor     = TRUE,
-    evict_fun     = truncated_distributions("norm", "c_o.")
-  ) %>% define_kernel(
-    name          = "seedbank_to_continuous", 
-    formula       = outSB. * c_o. ,
-    
-    c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
-    outSB.       = outSB,
-    
-    family        = "DC",
-    data_list     = data_list,
-    states        = list(c('size')),
-    uses_par_sets = FALSE,
-    evict_cor     = TRUE,
-    evict_fun     = truncated_distributions("norm", "c_o.")
-  ) %>% define_kernel(
-    name          = "seedbank_to_seedbank", 
-    formula       = staySB.,
-    
-    staySB.       = staySB,
-    
-    family        = "DD",
-    data_list     = data_list,
-    states        = list(c('b')),
-    uses_par_sets = FALSE,
-    evict_cor     = FALSE
-  )   %>% define_kernel(
-    name          = "continuous_to_seedbank", 
-    formula       = goSB.  * (p_b. * b. * d_size),
-    
-    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
-    b.            = exp(b_int + b_slope * size_1),
-    goSB.       = goSB,
-    
-    family        = "CD",
-    data_list     = data_list,
-    states        = list(c('size', 'b')),
-    uses_par_sets = FALSE,
-    evict_cor     = FALSE
-  )  %>%
-  define_impl(
-    make_impl_args_list(
-      kernel_names = c("P", "F", "seedbank_to_continuous", "seedbank_to_seedbank", "continuous_to_seedbank"), 
-      int_rule = rep("midpoint", 5),
-      state_start = c("size", "size", "b", "b", "size"), 
-      state_end = c("size", "size", "size", "b", "b")
-    )
-  ) %>% 
-  define_domains(
-    size = c(
-      min(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # lower bound (L)
-      max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
-      500 # number of mesh points
-    )
-  ) %>% 
-  define_pop_state(
-    n_size = runif(500),
-    n_b = 400, 
-    
-  ) %>% 
-  make_ipm(
-    normalize_pop_size = FALSE
-    #iterations = 100
-  )
-
-ipmr::lambda(base_IPM)
-
-#### Determinsitic, DI IPM for Soapstone data ####
-data_list <- list(
-  g_int     = coef(sizeMod_soap)[1], # growth 
-  g_slope   = coef(sizeMod_soap)[2],
-  g_sd      = sd(residuals(sizeMod_soap)),
-  s_int     = coef(survMod_soap)[1], # survival
-  s_slope   = coef(survMod_soap)[2],
-  p_b_int   = coef(flwrMod_soap)[1], #probability of flowering
-  p_b_slope = coef(flwrMod_soap)[2],
-  p_b_slope_2 = coef(flwrMod_soap)[3],
-  b_int   = coef(seedMod_soap)[1], #seed production
-  b_slope = coef(seedMod_soap)[2],
-  c_o_mu    = coef(recMod_soap), #recruit size distribution
-  c_o_sd    = sd(residuals(recMod_soap)), 
-  outSB  = outSB_all,
-  staySB = staySB_all,
-  goSB   = goSB_all, 
-  goCont = goCont_all                  
-)
-
-# inital population state
-init_size_state <- runif(500)
-
-soapstone_IPM <- init_ipm(sim_gen   = "general", 
-                              di_dd     = "di", 
-                              det_stoch = "det") %>% 
-  define_kernel(
-    name          = "P",
-    formula       =(1-p_b.) * s. * g. * d_size,
-    
-    s.            = 1/(1 + exp(-(s_int + s_slope * size_1))),
-    g.            = dnorm(size_2, g_mu., g_sd), 
-    g_mu.         = g_int + g_slope * size_1, 
-    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
-    
-    family        = "CC",
-    data_list     = data_list,
-    states        = list(c('size')),
-    uses_par_sets = FALSE,
-    evict_cor     = TRUE,
-    evict_fun     = truncated_distributions("norm", "g.")
-  ) %>% 
-  define_kernel(
-    name          = "F", 
-    formula       = goCont. * (p_b. * b. * c_o. * d_size),
-    
-    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
-    b.            = exp(b_int + b_slope * size_1),
-    c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
-    goCont.       = goCont,
-    
-    family        = "CC",
-    data_list     = data_list,
-    states        = list(c('size')),
-    uses_par_sets = FALSE,
-    evict_cor     = TRUE,
-    evict_fun     = truncated_distributions("norm", "c_o.")
-  ) %>% define_kernel(
-    name          = "seedbank_to_continuous", 
-    formula       = outSB. * c_o. ,
-    
-    c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
-    outSB.       = outSB,
-    
-    family        = "DC",
-    data_list     = data_list,
-    states        = list(c('size')),
-    uses_par_sets = FALSE,
-    evict_cor     = TRUE,
-    evict_fun     = truncated_distributions("norm", "c_o.")
-  ) %>% define_kernel(
-    name          = "seedbank_to_seedbank", 
-    formula       = staySB.,
-    
-    staySB.       = staySB,
-    
-    family        = "DD",
-    data_list     = data_list,
-    states        = list(c('b')),
-    uses_par_sets = FALSE,
-    evict_cor     = FALSE
-  )   %>% define_kernel(
-    name          = "continuous_to_seedbank", 
-    formula       = goSB.  * (p_b. * b. * d_size),
-    
-    p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
-    b.            = exp(b_int + b_slope * size_1),
-    goSB.       = goSB,
-    
-    family        = "CD",
-    data_list     = data_list,
-    states        = list(c('size', 'b')),
-    uses_par_sets = FALSE,
-    evict_cor     = FALSE
-  )  %>%
-  define_impl(
-    make_impl_args_list(
-      kernel_names = c("P", "F", "seedbank_to_continuous", "seedbank_to_seedbank", "continuous_to_seedbank"), 
-      int_rule = rep("midpoint", 5),
-      state_start = c("size", "size", "b", "b", "size"), 
-      state_end = c("size", "size", "size", "b", "b")
-    )
-  ) %>% 
-  define_domains(
-    size = c(
-      min(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # lower bound (L)
-      max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
-      500 # number of mesh points
-    )
-  ) %>% 
-  define_pop_state(
-    n_size = runif(500),
-    n_b = 400, 
-    
-  ) %>% 
-  make_ipm(
-    normalize_pop_size = FALSE
-    #iterations = 100
-  )
-
-ipmr::lambda(soapstone_IPM)
+# #### Determinsitic, DI IPM for Base data ####
+# data_list <- list(
+#   g_int     = coef(sizeMod_Base)[1], # growth 
+#   g_slope   = coef(sizeMod_Base)[2],
+#   g_sd      = sd(residuals(sizeMod_Base)),
+#   s_int     = coef(survMod_Base)[1], # survival
+#   s_slope   = coef(survMod_Base)[2],
+#   p_b_int   = coef(flwrMod_Base)[1], #probability of flowering
+#   p_b_slope = coef(flwrMod_Base)[2],
+#   p_b_slope_2 = coef(flwrMod_Base)[3],
+#   b_int   = coef(seedMod_Base)[1], #seed production
+#   b_slope = coef(seedMod_Base)[2],
+#   c_o_mu    = coef(recMod_Base), #recruit size distribution
+#   c_o_sd    = sd(residuals(recMod_Base)), 
+#   outSB  = outSB_all,
+#   staySB = staySB_all,
+#   goSB   = goSB_all, 
+#   goCont = goCont_all                  
+# )
+# 
+# # inital population state
+# init_size_state <- runif(500)
+# 
+# base_IPM <- init_ipm(sim_gen   = "general", 
+#                           di_dd     = "di", 
+#                           det_stoch = "det") %>% 
+#   define_kernel(
+#     name          = "P",
+#     formula       =(1-p_b.) * s. * g. * d_size,
+#     
+#     s.            = 1/(1 + exp(-(s_int + s_slope * size_1))),
+#     g.            = dnorm(size_2, g_mu., g_sd), 
+#     g_mu.         = g_int + g_slope * size_1, 
+#     p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+#     
+#     family        = "CC",
+#     data_list     = data_list,
+#     states        = list(c('size')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = TRUE,
+#     evict_fun     = truncated_distributions("norm", "g.")
+#   ) %>% 
+#   define_kernel(
+#     name          = "F", 
+#     formula       = goCont. * (p_b. * b. * c_o. * d_size),
+#     
+#     p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+#     b.            = exp(b_int + b_slope * size_1),
+#     c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+#     goCont.       = goCont,
+#     
+#     family        = "CC",
+#     data_list     = data_list,
+#     states        = list(c('size')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = TRUE,
+#     evict_fun     = truncated_distributions("norm", "c_o.")
+#   ) %>% define_kernel(
+#     name          = "seedbank_to_continuous", 
+#     formula       = outSB. * c_o. ,
+#     
+#     c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+#     outSB.       = outSB,
+#     
+#     family        = "DC",
+#     data_list     = data_list,
+#     states        = list(c('size')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = TRUE,
+#     evict_fun     = truncated_distributions("norm", "c_o.")
+#   ) %>% define_kernel(
+#     name          = "seedbank_to_seedbank", 
+#     formula       = staySB.,
+#     
+#     staySB.       = staySB,
+#     
+#     family        = "DD",
+#     data_list     = data_list,
+#     states        = list(c('b')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = FALSE
+#   )   %>% define_kernel(
+#     name          = "continuous_to_seedbank", 
+#     formula       = goSB.  * (p_b. * b. * d_size),
+#     
+#     p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+#     b.            = exp(b_int + b_slope * size_1),
+#     goSB.       = goSB,
+#     
+#     family        = "CD",
+#     data_list     = data_list,
+#     states        = list(c('size', 'b')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = FALSE
+#   )  %>%
+#   define_impl(
+#     make_impl_args_list(
+#       kernel_names = c("P", "F", "seedbank_to_continuous", "seedbank_to_seedbank", "continuous_to_seedbank"), 
+#       int_rule = rep("midpoint", 5),
+#       state_start = c("size", "size", "b", "b", "size"), 
+#       state_end = c("size", "size", "size", "b", "b")
+#     )
+#   ) %>% 
+#   define_domains(
+#     size = c(
+#       min(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # lower bound (L)
+#       max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
+#       500 # number of mesh points
+#     )
+#   ) %>% 
+#   define_pop_state(
+#     n_size = runif(500),
+#     n_b = 400, 
+#     
+#   ) %>% 
+#   make_ipm(
+#     normalize_pop_size = FALSE
+#     #iterations = 100
+#   )
+# 
+# ipmr::lambda(base_IPM)
+# 
+# #### Determinsitic, DI IPM for Soapstone data ####
+# data_list <- list(
+#   g_int     = coef(sizeMod_soap)[1], # growth 
+#   g_slope   = coef(sizeMod_soap)[2],
+#   g_sd      = sd(residuals(sizeMod_soap)),
+#   s_int     = coef(survMod_soap)[1], # survival
+#   s_slope   = coef(survMod_soap)[2],
+#   p_b_int   = coef(flwrMod_soap)[1], #probability of flowering
+#   p_b_slope = coef(flwrMod_soap)[2],
+#   p_b_slope_2 = coef(flwrMod_soap)[3],
+#   b_int   = coef(seedMod_soap)[1], #seed production
+#   b_slope = coef(seedMod_soap)[2],
+#   c_o_mu    = coef(recMod_soap), #recruit size distribution
+#   c_o_sd    = sd(residuals(recMod_soap)), 
+#   outSB  = outSB_all,
+#   staySB = staySB_all,
+#   goSB   = goSB_all, 
+#   goCont = goCont_all                  
+# )
+# 
+# # inital population state
+# init_size_state <- runif(500)
+# 
+# soapstone_IPM <- init_ipm(sim_gen   = "general", 
+#                               di_dd     = "di", 
+#                               det_stoch = "det") %>% 
+#   define_kernel(
+#     name          = "P",
+#     formula       =(1-p_b.) * s. * g. * d_size,
+#     
+#     s.            = 1/(1 + exp(-(s_int + s_slope * size_1))),
+#     g.            = dnorm(size_2, g_mu., g_sd), 
+#     g_mu.         = g_int + g_slope * size_1, 
+#     p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+#     
+#     family        = "CC",
+#     data_list     = data_list,
+#     states        = list(c('size')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = TRUE,
+#     evict_fun     = truncated_distributions("norm", "g.")
+#   ) %>% 
+#   define_kernel(
+#     name          = "F", 
+#     formula       = goCont. * (p_b. * b. * c_o. * d_size),
+#     
+#     p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+#     b.            = exp(b_int + b_slope * size_1),
+#     c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+#     goCont.       = goCont,
+#     
+#     family        = "CC",
+#     data_list     = data_list,
+#     states        = list(c('size')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = TRUE,
+#     evict_fun     = truncated_distributions("norm", "c_o.")
+#   ) %>% define_kernel(
+#     name          = "seedbank_to_continuous", 
+#     formula       = outSB. * c_o. ,
+#     
+#     c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+#     outSB.       = outSB,
+#     
+#     family        = "DC",
+#     data_list     = data_list,
+#     states        = list(c('size')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = TRUE,
+#     evict_fun     = truncated_distributions("norm", "c_o.")
+#   ) %>% define_kernel(
+#     name          = "seedbank_to_seedbank", 
+#     formula       = staySB.,
+#     
+#     staySB.       = staySB,
+#     
+#     family        = "DD",
+#     data_list     = data_list,
+#     states        = list(c('b')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = FALSE
+#   )   %>% define_kernel(
+#     name          = "continuous_to_seedbank", 
+#     formula       = goSB.  * (p_b. * b. * d_size),
+#     
+#     p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+#     b.            = exp(b_int + b_slope * size_1),
+#     goSB.       = goSB,
+#     
+#     family        = "CD",
+#     data_list     = data_list,
+#     states        = list(c('size', 'b')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = FALSE
+#   )  %>%
+#   define_impl(
+#     make_impl_args_list(
+#       kernel_names = c("P", "F", "seedbank_to_continuous", "seedbank_to_seedbank", "continuous_to_seedbank"), 
+#       int_rule = rep("midpoint", 5),
+#       state_start = c("size", "size", "b", "b", "size"), 
+#       state_end = c("size", "size", "size", "b", "b")
+#     )
+#   ) %>% 
+#   define_domains(
+#     size = c(
+#       min(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # lower bound (L)
+#       max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
+#       500 # number of mesh points
+#     )
+#   ) %>% 
+#   define_pop_state(
+#     n_size = runif(500),
+#     n_b = 400, 
+#     
+#   ) %>% 
+#   make_ipm(
+#     normalize_pop_size = FALSE
+#     #iterations = 100
+#   )
+# 
+# ipmr::lambda(soapstone_IPM)
 
 #### Deterministic, density-independent IPM for all data ####
 # vital-rate model names: survMod, sizeMod, seedMod_t, flwrMod_t, recMod, p.estab.est, outSB.est, staySB.est, goSB.est, goSdlng.est 
@@ -1212,226 +1212,227 @@ lambda(det_ipm_second)
 
 ## If we are worried about whether or not the model converged to stable dynamics, we can use the exported utility is_conv_to_asymptotic. The default tolerance for convergence is 1e-10, but can be changed with the 'tol' argument.
 is_conv_to_asymptotic(det_ipm_second, tol = 1e-10)
-#### deterministic, density dependent IPM for all data (no environmental covariates) ####
-### Implement the IPM 
-# use ipmr to fit the IPM
-data_list <- list(
-  g_int     = coef(sizeMod_dd)[1],
-  g_slope   = coef(sizeMod_dd)[2],
-  g_dd      = coef(sizeMod_dd)[3],
-  g_sd      = summary(sizeMod_dd)$sigma,
-  s_int     = coef(survMod_dd)[1],
-  s_slope   = coef(survMod_dd)[2],
-  s_dd      = coef(survMod_dd)[3],
-  p_b_int   = coef(flwrMod_dd)[1], #probability of flowering
-  p_b_slope = coef(flwrMod_dd)[2],
-  p_b_slope_2 = coef(flwrMod_dd)[3],
-  p_b_dd    = coef(flwrMod_dd)[4],
-  b_int   = coef(seedMod_dd)[1], #seed production
-  b_slope = coef(seedMod_dd)[2],
-  b_dd     = coef(seedMod_dd)[3],
-  c_o_int    = coef(recMod_dd)[1], #recruit size distribution
-  c_o_dd      = coef(recMod_dd)[2],
-  c_o_sd    = summary(recMod_dd)$sigma,
-  goSdlng   = goSdlng.est, # Probability that non-seedbank seeds will germinate into seedlings in year t+1
-  staySB = staySB.est, # Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
-  goSB = goSB.est, # probability that a seed produced by an adult plant in year t will enter the seedbank
-  outSB = outSB.est, # probability that a seedbank seed will germinate to a seedling in year t+1
-  p_estab = p.estab.est # probability that a seedling will establish into a rosette in t+1
-)
 
-## Next, we set up two functions to pass into the model. These perform the inverse logit transformations for the probability of flowering model (r_r/𝑟𝑟(𝑧)).
-# We'll set up some helper functions. The survival function in this model is a quadratic function, so we use an additional inverse logit function that can handle the quadratic term.
-
-
-## Now, we’re ready to begin making the IPM kernels. We change the sim_gen argument of init_ipm() to "general".
-det_dd_ipm <- init_ipm(sim_gen = "general", # make a general IPM
-                       di_dd = "dd", # make it density independent
-                       det_stoch = "det") %>% # make it deterministic
-  define_kernel(
-    name          = "P", # survival 
-    # We add d_ht to formula to make sure integration is handled correctly.
-    # This variable is generated internally by make_ipm(), so we don't need
-    # to do anything else.
-    formula       = (1-p_b.) * s. * g. * d_ht,
-    family        = "CC",
-    g.             = dnorm(ht_2, g_mu., g_sd),
-    g_mu.          = g_int + g_slope * ht_1 + g_dd * sum(n_ht_t),
-    s.             = inv_logit(s_int + s_slope* ht_1 + s_dd * sum(n_ht_t)),
-    p_b.          = inv_logit(p_b_int + p_b_slope* ht_1 + p_b_slope_2 * (ht_1^2) + p_b_dd * sum(n_ht_t)),
-    data_list     = data_list,
-    states        = list(c('ht')),
-    uses_par_sets = FALSE,
-    evict_cor     = TRUE,
-    evict_fun     = truncated_distributions('norm', 'g.')
-  ) %>%
-  define_kernel(
-    name          = "leave_seedlings", ## leave seedling stage and go to rosette stage
-    formula       = p_estab. * c_o. * d_ht,
-    family        = 'DC', # Note that now, family = "DC" because it denotes a discrete -> continuous transition
-    p_estab.      = p_estab,
-    c_o.          = dnorm(ht_2, c_o_mu., c_o_sd),
-    c_o_mu.       = c_o_int + c_o_dd * sum(n_ht_t),
-    data_list     = data_list,
-    states        = list(c('ht', "s")),   # Note that here, we add "s" to our list in states, because this kernel uses seedlings 
-    uses_par_sets = FALSE,
-    evict_cor     = TRUE,
-    evict_fun     = truncated_distributions('norm','c_o.')
-  ) %>%
-  define_kernel(
-    name    = "repro_to_seedlings",
-    formula       = (goSdlng.) * (p_b. * b. * d_ht),
-    family        = "CD",
-    goSdlng.      = goSdlng,
-    p_b.          = inv_logit(p_b_int + p_b_slope * ht_1 + p_b_slope_2* (ht_1^2)  + p_b_dd * sum(n_ht_t)),
-    b.            = exp(b_int + b_slope * ht_1 + b_dd * sum(n_ht_t)),
-    data_list     = data_list,
-    states        = list(c('ht', 's')),
-    uses_par_sets = FALSE,
-    evict_cor     = FALSE
-  ) %>%
-  define_kernel(
-    name          = 'seedbank_to_seedlings',
-    formula       = outSB.,
-    family        = 'DD',
-    outSB.        = outSB,
-    data_list     = data_list,
-    states        = list(c('b', 's')),
-    uses_par_sets = FALSE,
-    evict_cor = FALSE
-  ) %>%
-  define_kernel(
-    name    = "stay_seedbank",
-    formula       = staySB.,
-    family        = "DD",
-    staySB.        = staySB,
-    data_list     = data_list,
-    states        = list(c('b')),
-    uses_par_sets = FALSE,
-    evict_cor = FALSE
-  ) %>%
-  define_kernel(
-    name          = 'repro_to_seedbank',
-    formula       = (goSB.) * (p_b. * b. * d_ht),
-    family        = 'CD',
-    goSB.          = goSB, 
-    p_b.          = inv_logit(p_b_int + p_b_slope * ht_1 + p_b_slope_2* (ht_1^2)  + p_b_dd * sum(n_ht_t)),
-    b.            = exp(b_int + b_slope * ht_1 + b_dd * sum(n_ht_t)),
-    data_list     = data_list,
-    states        = list(c('b', 'ht')),
-    uses_par_sets = FALSE,
-    evict_cor = FALSE
-  ) %>%
-  define_impl(
-    make_impl_args_list(
-      kernel_names = c("P", "leave_seedlings", "repro_to_seedlings", "seedbank_to_seedlings", "stay_seedbank", "repro_to_seedbank"),
-      int_rule     = c(rep("midpoint", 6)),
-      state_start    = c('ht', "s", "ht", "b", "b", "ht"),
-      state_end      = c("ht", "ht", "s", "s", "b", "b")
-    )
-  ) %>%
-  define_domains(
-    # We can pass the variables we created above into define_domains
-    ht = c(L, U, n)
-  ) %>%
-  define_pop_state(
-    # We can also pass them into define_pop_state
-    pop_vectors = list(
-      n_ht = init_pop_vec,
-      n_b  = init_seed_bank,
-      n_s  = init_seedlings 
-    )
-  ) %>%
-  make_ipm(iterations = 100,
-           usr_funs = list(inv_logit   = inv_logit), return_main_env = TRUE )
-
-## lambda is a generic function to compute per-capita growth rates. It has a number of different options depending on the type of model
-lambda(det_dd_ipm)
-
-## If we are worried about whether or not the model converged to stable dynamics, we can use the exported utility is_conv_to_asymptotic. The default tolerance for convergence is 1e-10, but can be changed with the 'tol' argument.
-is_conv_to_asymptotic(det_dd_ipm, tol = 1e-10)
-## additional calculations
-lambda_ipmr <- lambda(det_ipm)
-repro_value <- left_ev(det_ipm)
-stable_dist <- right_ev(det_ipm)
-
-### Visualize the IPM kernel
-# first have to make a mega-kernel
-mega_mat <- make_iter_kernel(ipm = det_ipm, 
-                             mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P),
-)
-# check to make sure I constructed the mega-kernel correctly (should be nearly equal values)
-Re(eigen(mega_mat[[1]])$values[1]) - lambda(det_ipm)
-
-## visualize the full kernel 
-# define the meshpoints 
-meshpts <- seq(from = L, to = U, length = 500)
-# set up the palette
-pal <- hcl.colors(n = 100, palette = "Heat 2", rev = TRUE)
-# plot the continuous part of the kernel (leave out first two rows and cols that correspond to the discrete stages)
-## make the entire figure as a lattice plot
-graphics::layout(mat = matrix(c(1,4, 7, 2, 5, 8, 3, 6, 9),nrow = 3, ncol = 3), widths = c(1.5,1.5,6),heights = c(6,1.5,1.5))
-## B(t+1)
-par(mar = c(3,3,3,1))
-image(t(mega_mat$mega_matrix[1,3:502]^.1), xaxt = "n", yaxt = "n",
-      main = "B(t+1)",
-      col = pal[(round(min((mega_mat$mega_matrix[1,3:502])^.1),2)*100): 
-                  (round(max((mega_mat$mega_matrix[1,3:502])^.1),2)*100)]) 
-mtext(side = 1, text  = c("continous to \nseedbank"), line = -1, cex = .75)
-## S(t+1)
-par(mar = c(3,1,3,1))
-image(t(mega_mat$mega_matrix[2,3:502]^.1), xaxt = "n", yaxt = "n",
-      main = "S(t+1)",
-      col = pal[(round(min((mega_mat$mega_matrix[2,3:502])^.1),2)*100): 
-                  (round(max((mega_mat$mega_matrix[2,3:502])^.1),2)*100)]) 
-mtext(side = 1, text  = c("continous to \nseedlings"), line = -1, cex = .75)
-## K matrix
-par(mar = c(3,3,3,3)
-    ,mgp = c(1.75,.5,0)
-)
-image(x = meshpts, y = meshpts, t(mega_mat$mega_matrix[3:502,3:502])^.1,
-      xlab = "n(z,t); log(cm)", ylab = "n(z',t+1); log(cm)", 
-      main = "Continuous Stage (t+1)",
-      col = pal[(round(min( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100): (round(max( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100)]
-) ## get the correct values for the color ramp that correspond to the actual probabilities in the entire matrix
-text(x = 3.8, y = 2.25, c("Continuous Stage (t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
-abline(a = 0, b = 1, lty = 2)
-contour(x = meshpts, y = meshpts, 
-        t(mega_mat$mega_matrix[3:502,3:502]), 
-        add = TRUE, drawlabels = TRUE, nlevels = 10, col = "grey30")
-## seedlings to seedbank
-par(mar = c(1,3,1,1))
-image(as.matrix(0), xaxt = "n", yaxt = "n", col = "white") 
-mtext(side = 1, text  = c("can't go from \nseedling \nto seedbank"), line = -1, cex = .75)
-## seedlings to seedlings
-par(mar = c(1,1,1,1))
-image(as.matrix(0), xaxt = "n", yaxt = "n",  col = "white") 
-mtext(side = 1, text  = c("can't stay in \nseedlings"), line = -1, cex = .75)
-## S(t)
-par(mar = c(1,3,1,3))
-image(as.matrix(mega_mat$mega_matrix[3:502,2]^.1), yaxt = "n", xaxt = "n",
-      col = pal[(round(min( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100): 
-                  (round(max( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100)]) 
-text(x = 1.05,y = .5, c("S(t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
-mtext(side = 1, text  = c("seedling to continuous stage"), line = -1, cex = .75)
-## plot the staySB probability
-par(mar = c(3,3,1,1))
-image(as.matrix(mega_mat$mega_matrix[1,1]^.1), xaxt = "n", yaxt = "n",
-      col = pal[round(max(mega_mat$mega_matrix[1,1]^.1),2)*100])
-mtext(side = 1, text  = c("stay in \nseedbank"), line = -1, cex = .75)
-## plot the seedbank to seedlings probability
-par(mar = c(3,1,1,1))
-image(as.matrix(t(mega_mat$mega_matrix[2,1])^.1), xaxt = "n", yaxt = "n",
-      col = pal[round(max(t(mega_mat$mega_matrix[2,1])^.1),2)*100])
-mtext(side = 1, text = c("seedbank to \nseedlings"), line = -1, cex = .75)
-## B(t)(is all zeros--can't transition to continuous stage from the seedbank)
-par(mar = c(3,3,1,3))
-image(t(mega_mat$mega_matrix[3:502,1]^.1), yaxt = "n", xaxt = "n",
-      col = pal[(round(min( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100): 
-                  (round(max( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100)]) 
-text(x = 1.1,y = .5, c("B(t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
-mtext(side = 1, text = c("can't go from seedbank to continuous stage"), line = -1, cex = .75)
-dev.off()
+# #### deterministic, density dependent IPM for all data (no environmental covariates) ####
+# ### Implement the IPM 
+# # use ipmr to fit the IPM
+# data_list <- list(
+#   g_int     = coef(sizeMod_dd)[1],
+#   g_slope   = coef(sizeMod_dd)[2],
+#   g_dd      = coef(sizeMod_dd)[3],
+#   g_sd      = summary(sizeMod_dd)$sigma,
+#   s_int     = coef(survMod_dd)[1],
+#   s_slope   = coef(survMod_dd)[2],
+#   s_dd      = coef(survMod_dd)[3],
+#   p_b_int   = coef(flwrMod_dd)[1], #probability of flowering
+#   p_b_slope = coef(flwrMod_dd)[2],
+#   p_b_slope_2 = coef(flwrMod_dd)[3],
+#   p_b_dd    = coef(flwrMod_dd)[4],
+#   b_int   = coef(seedMod_dd)[1], #seed production
+#   b_slope = coef(seedMod_dd)[2],
+#   b_dd     = coef(seedMod_dd)[3],
+#   c_o_int    = coef(recMod_dd)[1], #recruit size distribution
+#   c_o_dd      = coef(recMod_dd)[2],
+#   c_o_sd    = summary(recMod_dd)$sigma,
+#   goSdlng   = goSdlng.est, # Probability that non-seedbank seeds will germinate into seedlings in year t+1
+#   staySB = staySB.est, # Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
+#   goSB = goSB.est, # probability that a seed produced by an adult plant in year t will enter the seedbank
+#   outSB = outSB.est, # probability that a seedbank seed will germinate to a seedling in year t+1
+#   p_estab = p.estab.est # probability that a seedling will establish into a rosette in t+1
+# )
+# 
+# ## Next, we set up two functions to pass into the model. These perform the inverse logit transformations for the probability of flowering model (r_r/𝑟𝑟(𝑧)).
+# # We'll set up some helper functions. The survival function in this model is a quadratic function, so we use an additional inverse logit function that can handle the quadratic term.
+# 
+# 
+# ## Now, we’re ready to begin making the IPM kernels. We change the sim_gen argument of init_ipm() to "general".
+# det_dd_ipm <- init_ipm(sim_gen = "general", # make a general IPM
+#                        di_dd = "dd", # make it density independent
+#                        det_stoch = "det") %>% # make it deterministic
+#   define_kernel(
+#     name          = "P", # survival 
+#     # We add d_ht to formula to make sure integration is handled correctly.
+#     # This variable is generated internally by make_ipm(), so we don't need
+#     # to do anything else.
+#     formula       = (1-p_b.) * s. * g. * d_ht,
+#     family        = "CC",
+#     g.             = dnorm(ht_2, g_mu., g_sd),
+#     g_mu.          = g_int + g_slope * ht_1 + g_dd * sum(n_ht_t),
+#     s.             = inv_logit(s_int + s_slope* ht_1 + s_dd * sum(n_ht_t)),
+#     p_b.          = inv_logit(p_b_int + p_b_slope* ht_1 + p_b_slope_2 * (ht_1^2) + p_b_dd * sum(n_ht_t)),
+#     data_list     = data_list,
+#     states        = list(c('ht')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = TRUE,
+#     evict_fun     = truncated_distributions('norm', 'g.')
+#   ) %>%
+#   define_kernel(
+#     name          = "leave_seedlings", ## leave seedling stage and go to rosette stage
+#     formula       = p_estab. * c_o. * d_ht,
+#     family        = 'DC', # Note that now, family = "DC" because it denotes a discrete -> continuous transition
+#     p_estab.      = p_estab,
+#     c_o.          = dnorm(ht_2, c_o_mu., c_o_sd),
+#     c_o_mu.       = c_o_int + c_o_dd * sum(n_ht_t),
+#     data_list     = data_list,
+#     states        = list(c('ht', "s")),   # Note that here, we add "s" to our list in states, because this kernel uses seedlings 
+#     uses_par_sets = FALSE,
+#     evict_cor     = TRUE,
+#     evict_fun     = truncated_distributions('norm','c_o.')
+#   ) %>%
+#   define_kernel(
+#     name    = "repro_to_seedlings",
+#     formula       = (goSdlng.) * (p_b. * b. * d_ht),
+#     family        = "CD",
+#     goSdlng.      = goSdlng,
+#     p_b.          = inv_logit(p_b_int + p_b_slope * ht_1 + p_b_slope_2* (ht_1^2)  + p_b_dd * sum(n_ht_t)),
+#     b.            = exp(b_int + b_slope * ht_1 + b_dd * sum(n_ht_t)),
+#     data_list     = data_list,
+#     states        = list(c('ht', 's')),
+#     uses_par_sets = FALSE,
+#     evict_cor     = FALSE
+#   ) %>%
+#   define_kernel(
+#     name          = 'seedbank_to_seedlings',
+#     formula       = outSB.,
+#     family        = 'DD',
+#     outSB.        = outSB,
+#     data_list     = data_list,
+#     states        = list(c('b', 's')),
+#     uses_par_sets = FALSE,
+#     evict_cor = FALSE
+#   ) %>%
+#   define_kernel(
+#     name    = "stay_seedbank",
+#     formula       = staySB.,
+#     family        = "DD",
+#     staySB.        = staySB,
+#     data_list     = data_list,
+#     states        = list(c('b')),
+#     uses_par_sets = FALSE,
+#     evict_cor = FALSE
+#   ) %>%
+#   define_kernel(
+#     name          = 'repro_to_seedbank',
+#     formula       = (goSB.) * (p_b. * b. * d_ht),
+#     family        = 'CD',
+#     goSB.          = goSB, 
+#     p_b.          = inv_logit(p_b_int + p_b_slope * ht_1 + p_b_slope_2* (ht_1^2)  + p_b_dd * sum(n_ht_t)),
+#     b.            = exp(b_int + b_slope * ht_1 + b_dd * sum(n_ht_t)),
+#     data_list     = data_list,
+#     states        = list(c('b', 'ht')),
+#     uses_par_sets = FALSE,
+#     evict_cor = FALSE
+#   ) %>%
+#   define_impl(
+#     make_impl_args_list(
+#       kernel_names = c("P", "leave_seedlings", "repro_to_seedlings", "seedbank_to_seedlings", "stay_seedbank", "repro_to_seedbank"),
+#       int_rule     = c(rep("midpoint", 6)),
+#       state_start    = c('ht', "s", "ht", "b", "b", "ht"),
+#       state_end      = c("ht", "ht", "s", "s", "b", "b")
+#     )
+#   ) %>%
+#   define_domains(
+#     # We can pass the variables we created above into define_domains
+#     ht = c(L, U, n)
+#   ) %>%
+#   define_pop_state(
+#     # We can also pass them into define_pop_state
+#     pop_vectors = list(
+#       n_ht = init_pop_vec,
+#       n_b  = init_seed_bank,
+#       n_s  = init_seedlings 
+#     )
+#   ) %>%
+#   make_ipm(iterations = 100,
+#            usr_funs = list(inv_logit   = inv_logit), return_main_env = TRUE )
+# 
+# ## lambda is a generic function to compute per-capita growth rates. It has a number of different options depending on the type of model
+# lambda(det_dd_ipm)
+# 
+# ## If we are worried about whether or not the model converged to stable dynamics, we can use the exported utility is_conv_to_asymptotic. The default tolerance for convergence is 1e-10, but can be changed with the 'tol' argument.
+# is_conv_to_asymptotic(det_dd_ipm, tol = 1e-10)
+# ## additional calculations
+# lambda_ipmr <- lambda(det_ipm)
+# repro_value <- left_ev(det_ipm)
+# stable_dist <- right_ev(det_ipm)
+# 
+# ### Visualize the IPM kernel
+# # first have to make a mega-kernel
+# mega_mat <- make_iter_kernel(ipm = det_ipm, 
+#                              mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P),
+# )
+# # check to make sure I constructed the mega-kernel correctly (should be nearly equal values)
+# Re(eigen(mega_mat[[1]])$values[1]) - lambda(det_ipm)
+# 
+# ## visualize the full kernel 
+# # define the meshpoints 
+# meshpts <- seq(from = L, to = U, length = 500)
+# # set up the palette
+# pal <- hcl.colors(n = 100, palette = "Heat 2", rev = TRUE)
+# # plot the continuous part of the kernel (leave out first two rows and cols that correspond to the discrete stages)
+# ## make the entire figure as a lattice plot
+# graphics::layout(mat = matrix(c(1,4, 7, 2, 5, 8, 3, 6, 9),nrow = 3, ncol = 3), widths = c(1.5,1.5,6),heights = c(6,1.5,1.5))
+# ## B(t+1)
+# par(mar = c(3,3,3,1))
+# image(t(mega_mat$mega_matrix[1,3:502]^.1), xaxt = "n", yaxt = "n",
+#       main = "B(t+1)",
+#       col = pal[(round(min((mega_mat$mega_matrix[1,3:502])^.1),2)*100): 
+#                   (round(max((mega_mat$mega_matrix[1,3:502])^.1),2)*100)]) 
+# mtext(side = 1, text  = c("continous to \nseedbank"), line = -1, cex = .75)
+# ## S(t+1)
+# par(mar = c(3,1,3,1))
+# image(t(mega_mat$mega_matrix[2,3:502]^.1), xaxt = "n", yaxt = "n",
+#       main = "S(t+1)",
+#       col = pal[(round(min((mega_mat$mega_matrix[2,3:502])^.1),2)*100): 
+#                   (round(max((mega_mat$mega_matrix[2,3:502])^.1),2)*100)]) 
+# mtext(side = 1, text  = c("continous to \nseedlings"), line = -1, cex = .75)
+# ## K matrix
+# par(mar = c(3,3,3,3)
+#     ,mgp = c(1.75,.5,0)
+# )
+# image(x = meshpts, y = meshpts, t(mega_mat$mega_matrix[3:502,3:502])^.1,
+#       xlab = "n(z,t); log(cm)", ylab = "n(z',t+1); log(cm)", 
+#       main = "Continuous Stage (t+1)",
+#       col = pal[(round(min( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100): (round(max( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100)]
+# ) ## get the correct values for the color ramp that correspond to the actual probabilities in the entire matrix
+# text(x = 3.8, y = 2.25, c("Continuous Stage (t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
+# abline(a = 0, b = 1, lty = 2)
+# contour(x = meshpts, y = meshpts, 
+#         t(mega_mat$mega_matrix[3:502,3:502]), 
+#         add = TRUE, drawlabels = TRUE, nlevels = 10, col = "grey30")
+# ## seedlings to seedbank
+# par(mar = c(1,3,1,1))
+# image(as.matrix(0), xaxt = "n", yaxt = "n", col = "white") 
+# mtext(side = 1, text  = c("can't go from \nseedling \nto seedbank"), line = -1, cex = .75)
+# ## seedlings to seedlings
+# par(mar = c(1,1,1,1))
+# image(as.matrix(0), xaxt = "n", yaxt = "n",  col = "white") 
+# mtext(side = 1, text  = c("can't stay in \nseedlings"), line = -1, cex = .75)
+# ## S(t)
+# par(mar = c(1,3,1,3))
+# image(as.matrix(mega_mat$mega_matrix[3:502,2]^.1), yaxt = "n", xaxt = "n",
+#       col = pal[(round(min( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100): 
+#                   (round(max( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100)]) 
+# text(x = 1.05,y = .5, c("S(t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
+# mtext(side = 1, text  = c("seedling to continuous stage"), line = -1, cex = .75)
+# ## plot the staySB probability
+# par(mar = c(3,3,1,1))
+# image(as.matrix(mega_mat$mega_matrix[1,1]^.1), xaxt = "n", yaxt = "n",
+#       col = pal[round(max(mega_mat$mega_matrix[1,1]^.1),2)*100])
+# mtext(side = 1, text  = c("stay in \nseedbank"), line = -1, cex = .75)
+# ## plot the seedbank to seedlings probability
+# par(mar = c(3,1,1,1))
+# image(as.matrix(t(mega_mat$mega_matrix[2,1])^.1), xaxt = "n", yaxt = "n",
+#       col = pal[round(max(t(mega_mat$mega_matrix[2,1])^.1),2)*100])
+# mtext(side = 1, text = c("seedbank to \nseedlings"), line = -1, cex = .75)
+# ## B(t)(is all zeros--can't transition to continuous stage from the seedbank)
+# par(mar = c(3,3,1,3))
+# image(t(mega_mat$mega_matrix[3:502,1]^.1), yaxt = "n", xaxt = "n",
+#       col = pal[(round(min( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100): 
+#                   (round(max( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100)]) 
+# text(x = 1.1,y = .5, c("B(t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
+# mtext(side = 1, text = c("can't go from seedbank to continuous stage"), line = -1, cex = .75)
+# dev.off()
 
 #### stochastic, density-independent IPM for all data with random effect for site and environmental covariates ####
 ### Vital Rate model names: survMod_env, sizeMod_env, seedMod_env, flwrMod_env, recMod_env, p.estab.est, outSB.est, staySB.est, goSB.est, goSdlng.est
@@ -2100,8 +2101,8 @@ for (i in 1:length(sites)) {
       family        = "CC",
       g.             = dnorm(ht_2, g_mu, g_sd),
       g_mu          = g_int + g_slope * ht_1 + g_dd * sum(n_ht_t),
-      s.             = inv_logit_r(s_int + s_slope * ht_1 + s_dd * sum(n_ht_t)),
-      p_b.          = inv_logit_2(p_b_int, p_b_slope, p_b_slope_2, ht_1),
+      s.             = inv_logit(lin.pred = (s_int + s_slope * ht_1 + s_dd * sum(n_ht_t))),
+      p_b.          = inv_logit(lin.pred= (p_b_int + p_b_slope * ht_1 + p_b_slope_2 * (I(ht_1)^2))),
       data_list     = data_list,
       states        = list(c('ht')),
       uses_par_sets = FALSE,
@@ -2126,7 +2127,7 @@ for (i in 1:length(sites)) {
       formula       = (goSdlng.) * (p_b. * b. * d_ht),
       family        = "CD",
       goSdlng.      = goSdlng,
-      p_b.          = inv_logit_2(p_b_int, p_b_slope, p_b_slope_2, ht_1),
+      p_b.          = inv_logit(lin.pred= (p_b_int + p_b_slope * ht_1 + p_b_slope_2 * (I(ht_1)^2))),
       b.            = exp(b_int + b_slope * ht_1),
       data_list     = data_list,
       states        = list(c('ht', 's')),
@@ -2158,7 +2159,7 @@ for (i in 1:length(sites)) {
       formula       = (goSB.) * (p_b. * b. * d_ht),
       family        = 'CD',
       goSB.          = goSB,
-      p_b.          = inv_logit_2(p_b_int, p_b_slope, p_b_slope_2, ht_1),
+      p_b.          = inv_logit(lin.pred= (p_b_int + p_b_slope * ht_1 + p_b_slope_2 * (I(ht_1)^2))),
       b.            = exp(b_int + b_slope * ht_1),
       data_list     = data_list,
       states        = list(c('b', 'ht')),
@@ -2200,8 +2201,7 @@ for (i in 1:length(sites)) {
       )
     ) %>%
     make_ipm(iterations = 100,
-             usr_funs = list(inv_logit_r   = inv_logit_r,
-                             inv_logit_2 = inv_logit_2), return_main_env = TRUE )
+             usr_funs = list(inv_logit = inv_logit), return_main_env = TRUE )
 
   ## rename the ipm object to have the name of site
   assign(paste0(site_now,"__det_DD_ipm"), value = temp_ipm)
@@ -2612,11 +2612,11 @@ use_proto <- det_ipm$proto_ipm
 # Now, we refit the vital rate models, and use the parameters<- setter function to update the original proto_ipm object with the new vital rate models. This saves us from re-typing the whole model pipeline again. Normally, we would bootstrap more than 50 times, but for the sake of this example and saving time, we will only do 50.
 for(i in 1:200) {
   ## sample continuous data
-  sample_ind <- seq(1, nrow(dat), by = 1)
+  sample_ind <- seq(1, nrow(dat_all), by = 1)
   
-  boot_data_ind   <- sample(sample_ind, size = nrow(dat), replace = TRUE)
+  boot_data_ind   <- sample(sample_ind, size = nrow(dat_all), replace = TRUE)
   
-  boot_data <- dat[boot_data_ind,]
+  boot_data <- dat_all[boot_data_ind,]
   
   ## sample discrete stage data
   sample_disc <- seq(1, nrow(discDat), by = 1)

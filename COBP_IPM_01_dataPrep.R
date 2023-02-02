@@ -129,9 +129,9 @@ seedlings_cont <- rbind(seedlings_cont, seedlings_2020)
 ## "seedlings_cont" contains the continuous seedling data
 # there are only values for 2018 and 2019, since we can't know whether seedlings from 2020 survived or not
 # make sure both dfs have the same column order
-dat <- dat[,names(seedlings_cont[,1:25])]
+datTemp <- dat[,names(seedlings_cont[,1:25])]
 # add seedlings_cont to the dat dataframe
-dat_all <- rbind(dat, seedlings_cont[,1:25])
+dat_all <- rbind(datTemp, seedlings_cont[,1:25])
 
 ## make sure that the "location" data in dat_all is correct
 dat_all[dat_all$Site %in% c("Crow_Creek", "Diamond_Creek", "Unnamed_Creek"),"Location"] <- "FEWAFB"
@@ -168,7 +168,7 @@ dat_all$SoilTemp_grow_C_s <- scale(dat_all$SoilTemp_grow_C)
 dat_all$tMean_grow_C_s <- scale(dat_all$tMean_grow_C)
 dat_all$precipWaterYr_cm_s <- scale(dat_all$precipWaterYr_cm)
 
-# get the number of recruits/year 
+#### get the number of recruits/year ####
 estabTemp <- dat %>% 
   dplyr::select(Plot_ID, Year, Quadrant, recruit) %>% 
   group_by(Plot_ID, Quadrant, Year) %>% 
@@ -325,7 +325,7 @@ for (i in 1:length(plots)) {
       n_recruits_tplus1 <- 0
     }
     # get the number of seedlings in year t
-    n_seedlings_t <- deframe(seedlings[seedlings$Plot_ID == plot_now & 
+    n_seedlings_t <- sum(seedlings[seedlings$Plot_ID == plot_now & 
                                  seedlings$Year == year_now, "Seedlings_t"])
     
     if (n_seedlings_t > n_recruits_tplus1) {
