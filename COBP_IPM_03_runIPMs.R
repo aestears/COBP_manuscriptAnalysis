@@ -335,6 +335,7 @@ contSeedlings_IPM <- init_ipm(sim_gen   = "general",
   )
 
 ipmr::lambda(contSeedlings_IPM)
+
 ## check for eviction from the model
 #To check for eviction, we plot the survival model and the column sums of the survival/growth (P) matrix. Eviction occurs when the column sums are lower than the survival models suggests that they should be.
 # define the x-axis values
