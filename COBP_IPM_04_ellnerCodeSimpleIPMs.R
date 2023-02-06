@@ -819,7 +819,7 @@ test <- param_fig_DIsecond %>%
   summarise("mean_value" = mean(value))
 param_fig <- left_join(param_fig_DIsecond, test)
 # plot the distribution of values
-ggplot(data = param_figDIsecond) + 
+ggplot(data = param_fig) + 
   geom_density(mapping = aes(value)) +
   geom_vline(aes(xintercept = mean_value, col = param)) + 
   geom_vline(aes(xintercept = 0), col = "grey", lty = 2) +
