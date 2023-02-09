@@ -10,7 +10,8 @@ library(ipmr)
 #### load vital rate models from previous script ####
 source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
 
-#### deterministic, density-independent IPM using only continuous stages ####
+#### IPM A #### 
+## deterministic, density-independent IPM using only continuous stages and data from all transitions ##
 ## calculate starting population state vectors
 # starting size of the seedbank
 # seedbank estimate data stored for each site is in the seeds_est_site d.f.
@@ -32,17 +33,20 @@ U <- max(dat_all$log_LL_t, na.rm = TRUE) * 1.2 # upper bound (U)
 n <- 500 
 
 # calculate probability of establishment (skipping seedbank stage)
+# calculate the number of seeds produced by each fruiting adult
 simple_seeds <- dat_all %>% 
   group_by(Plot_ID, Year) %>% 
   summarize("N_seeds_t" = sum(Num_seeds, na.rm = TRUE)) %>% 
   rename(Year_t = Year) %>% 
   mutate(Year_t = as.numeric(as.character(Year_t)))
+# calculate the number of seedlings recruited in each year
 simple_recruits <- dat_all %>% 
   group_by(Plot_ID, Year) %>% 
   summarize("N_recruits_t" = length(seedling)) %>% 
   rename(Year_t = Year) %>% 
   mutate(Year_tplus1 = as.numeric(as.character(Year_t)) - 1)
 
+#combine # seeds in previous year w/ number of seedlings
 simple_estabs <- simple_seeds %>% 
   left_join(simple_recruits, 
             by = c("Year_t" = "Year_tplus1",
@@ -55,6 +59,7 @@ simple_estabs[simple_estabs$p_estab == Inf &
                 is.na(simple_estabs$p_estab) == FALSE , 
               "p_estab"] <- NA
 
+# the probability of establisshment in the IPM is the average p(estab)
 p.estab.simple = mean(simple_estabs$p_estab, na.rm = TRUE)
 
 data_list <- list(
