@@ -39,7 +39,15 @@ for (i in 1:nrow(seedlings)) {
   if (seedlingNow$Seedlings_t > 0) {
     temp <- data.frame("Location" = NA, "Site" = rep(seedlingNow$Site, length.out = seedlingNow$Seedlings_t),
                        "Plot_ID" = seedlingNow$Plot_ID,
-                       "Quadrant" = seedlingNow$Quadrant, "ID" = NA, "X_cm" = NA, "Y_cm" = NA, "Year" = seedlingNow$Year, "LongestLeaf_cm" = NA, "survives_t" = 1, "flowering" = 0, "Num_capsules" = NA, "Stem_Herb" = NA, "Invert_Herb" = NA, "LeafSpots" = NA, "survives_tplus1" = NA, "longestLeaf_tminus1" = NA, "longestLeaf_tplus1" = NA,  "age" = 0,  "seedling" = 1, "index" = NA, "Num_seeds" = NA, "log_LL_t" = NA, "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, "N_seedlings_t" = seedlingNow$Seedlings_t, "N_adults_t" = NA, "N_all_t" = NA, "recruit" = NA)
+                       "Quadrant" = seedlingNow$Quadrant, "ID" = NA, "X_cm" = NA, "Y_cm" = NA, 
+                       "Year" = seedlingNow$Year, "LongestLeaf_cm" = NA, "survives_t" = 1, 
+                       "flowering" = 0, "Num_capsules" = NA, "Stem_Herb" = NA, 
+                       "Invert_Herb" = NA, "LeafSpots" = NA, "survives_tplus1" = NA, 
+                       "longestLeaf_tminus1" = NA, "longestLeaf_tplus1" = NA,  
+                       "age" = 0,  "seedling" = 1, "index" = NA, "Num_seeds" = NA, 
+                       "log_LL_t" = NA, "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, 
+                       "N_seedlings_t" = seedlingNow$Seedlings_t, "N_adults_t" = NA, 
+                       "N_all_t" = NA, "recruit" = NA)
     if (i == 1) {
       # add this data into the seedlings_long d.f
       seedlings_long <- temp
@@ -65,11 +73,13 @@ seedlings_long$LongestLeaf_cm = sizes
 # seedlings_long$LongestLeaf_NORM = sizes
 
 # try setting size according to a beta distributio
-sizes <- 3 * rbeta(n = 4425, shape1 = 3, shape2 = 1)
+#sizes <- 3 * rbeta(n = 4425, shape1 = 3, shape2 = 1)
 
-seedlings_long$LongestLeaf_NORM = sizes
+#seedlings_long$LongestLeaf_NORM = sizes
 
-# because we know the number of individuals that were 'recruited' into the adult plant stage in each t+1, we can estimate the number of seedlings that survived from t in each quadrat. We will randomly assign the these 'new recruits' to a seedling 
+# because we know the number of individuals that were 'recruited' into the adult 
+# plant stage in each t+1, we can estimate the number of seedlings that survived 
+# from t in each quadrat. We will randomly assign the these 'new recruits' to a seedling 
 # get the data for 'recruits' to the adult stage
 recruitsTemp <- dat[dat$recruit == 1,]
 # loop through by quadrat/year
@@ -114,12 +124,13 @@ for (i in 1:length(quads)) {
                            "seedling" = 1, "index" = NA, "Num_seeds" = NA, "log_LL_t" = NA, 
                            "log_LL_tplus1" = NA, "log_LL_tminus1" = NA, 
                            "N_seedlings_t" = NA, "N_adults_t" = NA, 
-                           "N_all_t" = NA, "recruit" = NA, 
-                           "LongestLeaf_NORM" = rnorm(numNewSdlngs, mean = 1.55, sd = .5))
+                           "N_all_t" = NA, "recruit" = NA#, 
+                           #"LongestLeaf_NORM" = rnorm(numNewSdlngs, mean = 1.55, sd = .5)
+                           )
         
         # truncate the estimated seedling sizes from the Normal distribution to between .1 and 3 
-        temp[temp$LongestLeaf_NORM<.1, "LongestLeaf_NORM"] <- 0.1
-        temp[temp$LongestLeaf_NORM>3, "LongestLeaf_NORM"] <- 3
+        #temp[temp$LongestLeaf_NORM<.1, "LongestLeaf_NORM"] <- 0.1
+        #temp[temp$LongestLeaf_NORM>3, "LongestLeaf_NORM"] <- 3
         # then add this to the seedsNow d.f
         if (nrow(seedsNow) == 0) {
           seedsNow <- temp
@@ -150,9 +161,9 @@ seedlings_cont <- rbind(seedlings_cont, seedlings_2020)
 
 ### TEMPORARILY change the "seedlings_cont$longestLeaf_cm" data to have the 
 # seedling size information from a NORMAL DISTRIBUTION (rather than a UNIFORM DISTRIBUTION like it did before)
-seedlings_cont <- seedlings_cont %>% 
-  dplyr::select(-LongestLeaf_cm) %>% 
-  rename(LongestLeaf_cm = LongestLeaf_NORM)
+#seedlings_cont <- seedlings_cont %>% 
+ # dplyr::select(-LongestLeaf_cm) %>% 
+  #rename(LongestLeaf_cm = LongestLeaf_NORM)
 
 ## "seedlings_cont" contains the continuous seedling data
 # there are only values for 2018 and 2019, since we can't know whether seedlings from 2020 survived or not
@@ -256,9 +267,9 @@ seedStudyGerms <- c(5,4,3,0.01,0.01,1,0.01,0.01,0.01,9,4,9,0,1,1,8,20,1)
 seedStudyGerms.1 <- seedStudyGerms/germ.rt
 # convert the volume of the soil samples to the volume of the plots to get approx. number of (seedbank + seed rain) seeds in each plot
 # cores are 5.5cm in diameter and 3cm deep, and there are 20 of them/plot
-coreVol = ((pi*(5.5/2)^2)*2.5)*20 ## 1187.915 cm^3 is the total volume of the soil cores for one plot
+coreVol <- ((pi*(5.5/2)^2)*2.5)*20 ## 1187.915 cm^3 is the total volume of the soil cores for one plot
 # calculate the volume of the first 3cm of soil in the plots
-plotVol = 200*200*3
+plotVol <- 200*200*3
 # estimate the number of seeds in the plot
 seedsEst.all <- (plotVol*seedStudyGerms.1)/coreVol
 
@@ -295,13 +306,13 @@ seeds_est_site[seeds_est_site$seedbank_est < 0, "seedbank_est"] <- 100
 # formula = (germs*(1-germ.rate) - mean no. of seeds produced in previous year)
 seedBank_est <- mean(seeds_est$coreSeeds_est - seeds_est$SeedRain_avg)
 
-## calculate average number of seedlings/year for each site (NOT mean seedling no.)--mean for each plot across all years, then summed values for each site
+## calculate average number of seedlings/year for each site (NOT mean seedling no.)--
+# mean for each plot across all years, then summed values for each site
 seedlings_site <- seedlings %>% 
   group_by(Plot_ID, Site) %>% 
   summarise(Seedlings_t = mean(Seedlings_t)) %>% 
   group_by(Site) %>% 
   summarise(Seedlings_t = sum(Seedlings_t))
-
 
 # change seedbank estimate that are negative to small positive numbers
 seeds_est_faked <- seeds_est 
@@ -394,25 +405,32 @@ for (i in 1:length(plots)) {
 # put in a 'discrete' stage d.f
 discDat <- seeds.out
 
-####calculate the total population size for each quad/year combo ####
-N_all <- dat_all %>% 
-  group_by(Plot_ID, Year) %>% 
-  summarize(N_all = n())
-# add to the dat_all d.f
-dat_all <- dat_all %>% left_join(N_all)
+## double check that data in dat_all are correct
 # make sure log(longest leaf) is calculated for all plants
 dat_all$log_LL_t <- log(dat_all$LongestLeaf_cm)
-# make sure pop size values are correct
-N_all_dat <- dat_all %>% group_by(Site, Plot_ID, Year) %>% 
-  summarize(N_all_t = n())
-N_adultSeedling_dat <- dat_all %>% group_by(Site, Plot_ID, Year, seedling) %>% 
+dat_all[dat_all$Site %in% c("Crow Creek", "Crow_Creek"), "Site"] <- "Crow_Creek"
+dat_all[dat_all$Site %in% c("Diamond Creek", "Diamond_Creek"), "Site"] <- "Diamond_Creek"
+dat_all[dat_all$Site %in% c("Unnamed Creek", "Unnamed_Creek"), "Site"] <- "Unnamed_Creek"
+
+dat_all[dat_all$Site %in% c("Crow_Creek", "Diamond_Creek", "Unnamed_Creek"), "Location"] <- "FEWAFB"
+dat_all[dat_all$Site %in% c("Meadow", "HQ5", "HQ3"), "Location"] <- "Soapstone"
+
+####calculate the total population size for each quad/year combo ####
+N_all <- dat_all %>% 
+  group_by(Site, Plot_ID, Year) %>% 
+  summarize(N_all_plot_t = n())
+
+N_adultSeedling_dat <- dat_all %>% 
+  group_by(Site, Plot_ID, Year, seedling) %>% 
   summarize(N = n()) %>% 
   pivot_wider(id_cols = c(Plot_ID, Year), names_from = seedling, values_from = N) %>% 
-  rename(N_adults_t = `0`, N_seedlings_t = `1`)
+  rename(N_adults_plot_t = `0`, N_seedlings_plot_t = `1`)
 
-N_dat <- left_join(N_all_dat, N_adultSeedling_dat)
+N_dat <- left_join(N_all, N_adultSeedling_dat)
+
 ## get site-level N 
-N_site <- dat_all %>% group_by(Site, Year) %>% 
+N_site <- dat_all %>% 
+  group_by(Site, Year) %>% 
   summarize(N_Site_t = n())
 N_dat <- left_join(N_dat, N_site)
 
@@ -421,6 +439,6 @@ dat_all <- dat_all  %>%
   left_join(N_dat)
 
 # # write the discreteDat d.f to file
-#write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
+write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
 # # also write the continuous seedling d.f to file
-#write.csv(x = dat_all, file = "../Processed_Data/allDat_plus_contSeedlings.csv", row.names = FALSE)
+write.csv(x = dat_all, file = "../Processed_Data/allDat_plus_contSeedlings.csv", row.names = FALSE)
