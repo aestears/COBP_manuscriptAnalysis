@@ -38,7 +38,8 @@ germ.rt <- germ.rt_temp * .8
 # the viability rate (proportion of seeds produced by an adult plant that are viable) is the 'total_seed_viab.rt' derived from the Burgess paper results
 viab.rt <- total_seed_viab.rt
 
-#### Vital Rate Models for Deterministic, density-independent IPM with all data + continuous seedlings####
+#### Vital Rate Models for IPM A and IPM B####
+### Deterministic, density-independent IPM with all data + continuous seedlings ###
 ## the dataset is called 'dat_all'
  ### Make vital rate models 
  ## Survival ($s(z)$)

@@ -23,7 +23,7 @@ h = meshpts[2] - meshpts[1]
 #### DI all dat IPM ####
 ## called 'mat_all_DI' 
 # calculate lambda
-(lam_allDI <- Re(eigen(mat_all_DI)$values[1])) # 1.48
+(lam_allDI <- Re(eigen(mat_all_DI)$values[1])) # 1.91
 
 ## calculate the stable size distribution
 w.eigen_temp <-  Re(eigen(mat_all_DI)$vectors[,1]) 
@@ -336,9 +336,9 @@ surv.seeds <-  0.9
 perc_changes <- seq(0.1,2, by = .05)
 
 model_perturbs <-  data.frame( "param_name" = as.character(NA), 
-                          "param_OGval" = NA,
-                          "param_newVal" = NA, 
-                          "lambda" = NA)
+                               "param_OGval" = NA,
+                               "param_newVal" = NA, 
+                               "lambda" = NA)
 # loop through each of the vital rate processes
 for (i in 1:length(names(paramCont))) {
   # get the name of the vital rate
@@ -446,52 +446,52 @@ for (i in 1:length(names(paramCont))) {
     }
     for (l in 2:ncol(paramCont[[modelName]])) {
       for (k in 1:length(perc_changes)) {
-      paramNow <- paramCont
-      # replace the value in the parameter list
-      paramNow[[modelName]][1,l] <- paramCont[[modelName]][1,l]*perc_changes[k]
-      # make the IPM
-      K <- array(0,c(n+1,n+1))
-      b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
-      meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
-      h=(U-L)/n # bin width 
-      # Survival and growth 
-      S <- diag(S.fun(meshp, paramNow)) # Survival # put survival probabilities in the diagonal of the matrix
-      G <- h * t(outer(meshp,meshp,GR.fun, paramNow)) # Growth
-      #Recruits distribution 
-      c_o <- h * matrix(rep(SDS.fun(meshp, paramNow),n),n,n,byrow=F)
-      # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
-      #Probability of flowering
-      Pb = (FL.fun(meshp, paramNow))
-      #Number of seeds produced according to adult size
-      b_seed = (SDP.fun(meshp, paramNow))
-      FecALL= Pb * b_seed
-      # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
-      S_new <- S * (1-Pb)
-      # Control for eviction:
-      G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
-      c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
-      # make the continuous part of the P matrix
-      Pkernel.cont <- as.matrix(G %*% S_new)
-      # seedbank (first column of your K)
-      Pkernel.seedbank = c(staySB_all, outSB_all*c_o[,1]) # seeds survive and go to continuous
-      # Make the full P kernel
-      Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
-      ## make the F kernel
-      Fkernel.cont <-  as.matrix(goCont_all * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
-      Fkernel.discr  <- matrix(c(0, goSB_all * (FecALL)), nrow = 1)
-      Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
-      # calculate the entire matrix
-      mat_now <-Pkernel+Fkernel
-      mat_now[which(is.nan(mat_now))] <- NA
-      # calculate lambda
-      lambda_now <- Re(eigen(mat_now)$values[1])
-      # store the data
-      model_perturbs <- rbind(model_perturbs, 
-                              data.frame(
-                                "param_name" = paste0(modelName,"_stndDev"), 
-                                "param_OGval" = paramCont[[modelName]][1,l],
-                                "param_newVal" = paramNow[[modelName]][1,l], 
-                                "lambda" = as.numeric(lambda_now)))
+        paramNow <- paramCont
+        # replace the value in the parameter list
+        paramNow[[modelName]][1,l] <- paramCont[[modelName]][1,l]*perc_changes[k]
+        # make the IPM
+        K <- array(0,c(n+1,n+1))
+        b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+        meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+        h=(U-L)/n # bin width 
+        # Survival and growth 
+        S <- diag(S.fun(meshp, paramNow)) # Survival # put survival probabilities in the diagonal of the matrix
+        G <- h * t(outer(meshp,meshp,GR.fun, paramNow)) # Growth
+        #Recruits distribution 
+        c_o <- h * matrix(rep(SDS.fun(meshp, paramNow),n),n,n,byrow=F)
+        # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+        #Probability of flowering
+        Pb = (FL.fun(meshp, paramNow))
+        #Number of seeds produced according to adult size
+        b_seed = (SDP.fun(meshp, paramNow))
+        FecALL= Pb * b_seed
+        # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+        S_new <- S * (1-Pb)
+        # Control for eviction:
+        G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+        c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+        # make the continuous part of the P matrix
+        Pkernel.cont <- as.matrix(G %*% S_new)
+        # seedbank (first column of your K)
+        Pkernel.seedbank = c(staySB_all, outSB_all*c_o[,1]) # seeds survive and go to continuous
+        # Make the full P kernel
+        Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+        ## make the F kernel
+        Fkernel.cont <-  as.matrix(goCont_all * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+        Fkernel.discr  <- matrix(c(0, goSB_all * (FecALL)), nrow = 1)
+        Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+        # calculate the entire matrix
+        mat_now <-Pkernel+Fkernel
+        mat_now[which(is.nan(mat_now))] <- NA
+        # calculate lambda
+        lambda_now <- Re(eigen(mat_now)$values[1])
+        # store the data
+        model_perturbs <- rbind(model_perturbs, 
+                                data.frame(
+                                  "param_name" = paste0(modelName,"_stndDev"), 
+                                  "param_OGval" = paramCont[[modelName]][1,l],
+                                  "param_newVal" = paramNow[[modelName]][1,l], 
+                                  "lambda" = as.numeric(lambda_now)))
       }
     }
   }
@@ -628,7 +628,7 @@ lambda_det.di <- lambda(det_ipm)
 # compute elasticity and sensitivity matrices
 v.dot.w_det.di <- sum(stable.size.dist_det.di *repro.val_det.di)*h
 mega.mat_det.di_proto <- format_mega_kernel(ipm = det_ipm, 
-                                      mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P))
+                                            mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P))
 mega.mat_det.di <- mega.mat_det.di_proto$mega_matrix[3:502,3:502]
 # calculate the sensitivity function (whole kernel)
 sens_det.di <- outer(repro.val_det.di,stable.size.dist_det.di, '*')/(v.dot.w_det.di)
@@ -669,11 +669,11 @@ dK_by_ds <- outer(meshpts, meshpts,
                   function(z1, z) {
                     (1 - 
                        (1/(1 + exp(-(data_list$p_b_int + data_list$p_b_slope * z + data_list$p_b_slope_2 * z^2))))) * # Pb(z)
-                       (dnorm(x = z1, 
-                              mean = (data_list$g_int + data_list$g_slope * z),
-                              sd = data_list$g_sd)) # G(z',z)
+                      (dnorm(x = z1, 
+                             mean = (data_list$g_int + data_list$g_slope * z),
+                             sd = data_list$g_sd)) # G(z',z)
                   }
-                    )
+)
 s.sens.z <- apply(sens_det.di * dK_by_ds, 2, sum) * h
 s.elas.z <- s.sens.z * (data_list$s_int + data_list$s_slope * meshpts)/lambda_det.di
 plot(x = meshpts, y = s.sens.z, type = 'l', ylim = c(0,1), main = "s(z)", ylab = "sensitivity/elasticity", xlab = "ln(longest leaf_t)")
@@ -682,16 +682,16 @@ legend('topleft', legend = c("sensitivity", "elasticity"), lty = c(1,2))
 
 # Pb(z)
 dK_by_dPb <- outer(meshpts, meshpts, 
-                  function(z1, z) {
-                    ((data_list$s_int + data_list$s_slope * z) * # s(z)
-                      (dnorm(x = z1, # G(z',z)
-                             mean = (data_list$g_int + data_list$g_slope * z),
-                             sd = data_list$g_sd)))+
-                      (data_list$goSdlng * 
-                         (1/(1 + exp(-(data_list$b_int + data_list$b_slope * z ))))) + 
-                      (data_list$goSB * 
-                         (1/(1 + exp(-(data_list$b_int + data_list$b_slope * z )))))
-                  }
+                   function(z1, z) {
+                     ((data_list$s_int + data_list$s_slope * z) * # s(z)
+                        (dnorm(x = z1, # G(z',z)
+                               mean = (data_list$g_int + data_list$g_slope * z),
+                               sd = data_list$g_sd)))+
+                       (data_list$goSdlng * 
+                          (1/(1 + exp(-(data_list$b_int + data_list$b_slope * z ))))) + 
+                       (data_list$goSB * 
+                          (1/(1 + exp(-(data_list$b_int + data_list$b_slope * z )))))
+                   }
 )
 Pb.sens.z <- apply(sens_det.di * dK_by_dPb, 2, sum) * h
 Pb.elas.z <- Pb.sens.z * ((1/(1 + exp(-(data_list$p_b_int + data_list$p_b_slope * meshpts + data_list$p_b_slope_2 * meshpts^2))))/lambda_det.di)
@@ -701,12 +701,12 @@ legend('topleft', legend = c("sensitivity", "elasticity"), lty = c(1,2))
 
 # pEstab
 dK_by_dpEstab <- outer(meshpts, meshpts, 
-                   function(z1, z) {
-                     dnorm(z1, 
-                           mean = data_list$c_o_mu, 
-                           sd = data_list$c_o_sd
-                           )
-                   }
+                       function(z1, z) {
+                         dnorm(z1, 
+                               mean = data_list$c_o_mu, 
+                               sd = data_list$c_o_sd
+                         )
+                       }
 )
 pEstab.sens.z <- apply(sens_det.di * dK_by_dpEstab, 2, sum) * h
 pEstab.elas.z <- pEstab.sens.z * (data_list$p_estab/lambda_det.di)
@@ -716,11 +716,11 @@ legend('topleft', legend = c("sensitivity", "elasticity"), lty = c(1,2))
 
 # b(z)
 dK_by_db <- outer(meshpts, meshpts, 
-                   function(z1, z) {
-                     data_list$goSdlng * (1/(1 + exp(-(data_list$p_b_int + data_list$p_b_slope * z + data_list$p_b_slope_2 * z^2)))) # Pb(z) 
-                     +
-                       data_list$goSB * (1/(1 + exp(-(data_list$p_b_int + data_list$p_b_slope * z + data_list$p_b_slope_2 * z^2)))) # Pb(z)
-                   }
+                  function(z1, z) {
+                    data_list$goSdlng * (1/(1 + exp(-(data_list$p_b_int + data_list$p_b_slope * z + data_list$p_b_slope_2 * z^2)))) # Pb(z) 
+                    +
+                      data_list$goSB * (1/(1 + exp(-(data_list$p_b_int + data_list$p_b_slope * z + data_list$p_b_slope_2 * z^2)))) # Pb(z)
+                  }
 )
 b.sens.z <- apply(sens_det.di * dK_by_db, 2, sum) * h
 b.elas.z <- b.sens.z * ((1/(1 + exp(-(data_list$b_int + data_list$b_slope * meshpts))))/lambda_det.di)
@@ -736,10 +736,10 @@ legend('topleft', legend = c("sensitivity", "elasticity"), lty = c(1,2))
 
 # goSdlng / goSB
 dK_by_dgoSdlng <- outer(meshpts, meshpts, 
-                   function(z1, z) {
-                     (1/(1 + exp(-(data_list$p_b_int + data_list$p_b_slope * z + data_list$p_b_slope_2 * z^2)))) *
-                          (1/(1 + exp(-(data_list$b_int + data_list$b_slope * z )))) # b(z)
-                   }
+                        function(z1, z) {
+                          (1/(1 + exp(-(data_list$p_b_int + data_list$p_b_slope * z + data_list$p_b_slope_2 * z^2)))) *
+                            (1/(1 + exp(-(data_list$b_int + data_list$b_slope * z )))) # b(z)
+                        }
 )
 goSdlng.sens.z <- apply(sens_det.di * dK_by_dgoSdlng, 2, sum) * h
 goSdlng.elas.z <- goSdlng.sens.z * data_list$goSdlng/lambda_det.di
@@ -751,7 +751,7 @@ legend('topleft', legend = c("sensitivity", "elasticity"), lty = c(1,2))
 dK_by_dG <- outer(meshpts, meshpts, 
                   function(z1, z) {
                     (1 - (1/(1 + exp(-(data_list$p_b_int + data_list$p_b_slope * z + data_list$p_b_slope_2 * z^2))))) * 
-                       (data_list$s_int + data_list$s_slope * z)
+                      (data_list$s_int + data_list$s_slope * z)
                   }
 )
 G.sens.z <- sens_det.di * dK_by_dG
@@ -864,8 +864,8 @@ for (i in 1:length(par_names)) {
                                         "param_newVal" = data_list[[par_now]] * perc_now,
                                         "perturbation" = perc_now, 
                                         "lambda" = as.numeric(lambda_now)
-                                        )
                              )
+      )
     } else {
       disc_perturbs <- data.frame(
         "param_name" = par_now, 
@@ -873,7 +873,7 @@ for (i in 1:length(par_names)) {
         "param_newVal" = data_list[[par_now]] * perc_now,
         "perturbation" = perc_now, 
         "lambda" = as.numeric(lambda_now)
-        )
+      )
     }
   }
 }
@@ -974,7 +974,7 @@ possible_vals <- data.frame("viab_rt" = c(rep_len(.05, length.out = 20),
                             "germ_rt" = rep(
                               seq(from = 0.05, to = 1, by = .05), 
                               times = 20)
-                            )
+)
 
 rm(germ_viab_perturbs)
 for (i in 1:nrow(possible_vals)) {
@@ -1019,8 +1019,8 @@ for (i in 1:nrow(possible_vals)) {
         "lambda" = as.numeric(lambda_now)
       )
     }
-    }
   }
+}
 
 
 outSB_now <- germ_now
@@ -1059,10 +1059,10 @@ ggplot(data = germ_viab_perturbs) +
 # compare IPM using the first transition to an IPM using the second transition
 # get the K matrices for the IPMS
 K_first <- format_mega_kernel(ipm = det_ipm_first, 
-                                            mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P))$mega_matrix
+                              mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P))$mega_matrix
 
 K_second <- format_mega_kernel(ipm = det_ipm_second, 
-                                     mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P))$mega_matrix
+                               mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P))$mega_matrix
 # calculate the arithmetic mean of the two IPMs
 IPM_mid <- (K_first + K_second)/2
 # calculate the difference between the two IPMs

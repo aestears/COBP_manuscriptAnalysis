@@ -344,8 +344,17 @@ preds <- predict(object = survMod_all, newdata = data.frame("log_LL_t" = meshpts
 ## plot the model predictions
 plot(x = meshpts, y = preds, ylab = "Survival Probability", type = "l")
 # plot the survival values from the P matrix (column sums)
-points(meshpts,apply(contSeedlings_IPM$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
+points(meshpts,apply(ipm_B$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
 # %% problem... it appears that there is eviction occuring? is it possible to have eviction in the center, rather than the edges? 
+
+
+meshpts <- seq(from = (min(dat_all$log_LL_t, na.rm = TRUE) * .8), to = (max(dat_all$log_LL_t, na.rm = TRUE) * 1.2) , length.out = 500)
+# plot the model-predicted survival probs.
+preds <- predict(object = survMod_all, newdata = data.frame("log_LL_t" = meshpts), type = 'response')
+plot(x = meshpts, y = preds, ylab = "Survival Probability", type = "l")
+# plot the survival values from the P matrix
+points(meshpts,apply(ipm_A$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
+
 
 #### Deterministic, density-dependent IPM with CONTINOUS SEEDLINGS ####
 data_list <- list(
