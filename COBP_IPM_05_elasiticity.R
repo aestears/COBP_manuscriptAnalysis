@@ -571,17 +571,17 @@ v.eigen_temp <- Re(eigen(t(IPM.true$K))$vectors[,1])
 repro.val_ellner <- v.eigen_temp/v.eigen_temp[1]
 
 #### for simple IPM from impr code ####
-simple_ipm_iterK <- make_iter_kernel(ipm = simple_ipm, name_ps = "P", f_forms = "F")$mega_matrix
+ipm_A_iterK <- make_iter_kernel(ipm = ipm_A, name_ps = "P", f_forms = "F")$mega_matrix
 # eigen things using ipmr functions
-lambda(simple_ipm) # 1.417
-w.eigen_simple <- ipmr::right_ev(ipm = simple_ipm)$size_w
-v.eigen_temp2 <- ipmr::left_ev(ipm = simple_ipm)$size_v
+lambda(ipm_A) # 1.417
+w.eigen_simple <- ipmr::right_ev(ipm = ipm_A)$size_w
+v.eigen_temp2 <- ipmr::left_ev(ipm = ipm_A)$size_v
 v.eigen_simple <- v.eigen_temp2/v.eigen_temp2[1]
 # eigen things using iteration matrix
-Re(eigen(simple_ipm_iterK)$values[1]) # 1.417
-w.eigen_simple.hand <- Re(eigen(simple_ipm_iterK)$vectors[,1])
+Re(eigen(ipm_A_iterK)$values[1]) # 1.417
+w.eigen_simple.hand <- Re(eigen(ipm_A_iterK)$vectors[,1])
 stable.dist_simple.hand <- w.eigen_simple.hand/sum(w.eigen_simple.hand) 
-v.eigen_simple.hand <- Re(eigen(t(simple_ipm_iterK))$vectors[,1])
+v.eigen_simple.hand <- Re(eigen(t(ipm_A_iterK))$vectors[,1])
 repro.val_sipmle.hand=v.eigen_simple.hand/v.eigen_simple.hand[1] 
 
 # compare stable age distributions
@@ -600,13 +600,13 @@ v.dot.w <- sum(w.eigen_simple*v.eigen_simple)*h #(where h = step size; size btwn
 # compute the sensitivity matrix
 sens <- outer(v.eigen_simple,w.eigen_simple)/v.dot.w
 # compute the elasticity matrix
-elas <- matrix(as.vector(sens)*as.vector(simple_ipm_iterK)/lambda(simple_ipm),nrow=500)
+elas <- matrix(as.vector(sens)*as.vector(ipm_A_iterK)/lambda(ipm_A),nrow=500)
 image(sens)
 image(elas)
 
 # calculate the damping ratio (to determine if the asymptotic rates are good approximations of transient dynamics)
-(lam_simple <- Re(eigen(simple_ipm_iterK)$values[1])) # asymptotic growth rate
-(damp_simple=Re(eigen(simple_ipm_iterK)$values[1])/Re(eigen(simple_ipm_iterK)$values[2])) # damping ratio
+(lam_simple <- Re(eigen(ipm_A_iterK)$values[1])) # asymptotic growth rate
+(damp_simple=Re(eigen(ipm_A_iterK)$values[1])/Re(eigen(ipm_A_iterK)$values[2])) # damping ratio
 # 5.65; indicating that the dominant eigenvalue (lambda) is dictating transient dynamics
 
 #### general, deterministic, density-independent IPM ####
