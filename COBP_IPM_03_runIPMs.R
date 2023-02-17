@@ -13,16 +13,8 @@ source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
 #### IPM A #### 
 ## deterministic, density-independent IPM using only continuous stages and data from all transitions ##
 ## calculate starting population state vectors
-# starting size of the seedbank
-# seedbank estimate data stored for each site is in the seeds_est_site d.f.
-init_seed_bank <- sum(seeds_est_site$seedbank_est)
-# Use seedling data to calculate the starting number of seedlings 
-# seedling data stored in the 'seedling_site' d.f.
-init_seedlings <- sum(seedlings_site$Seedlings_t)
-# starting number of individuals in the continuous stage
-init_pop_vec   <- runif(500) 
 
-
+## define a function to get predictions from a glm with a logit link
 inv_logit <- function(lin.pred) {
   1/(1 + exp(-(lin.pred)))
 }
@@ -34,33 +26,33 @@ n <- 500
 
 # calculate probability of establishment (skipping seedbank stage)
 # calculate the number of seeds produced by each fruiting adult
-simple_seeds <- dat_all %>% 
+ipm_A_seeds <- dat_all %>% 
   group_by(Plot_ID, Year) %>% 
   summarize("N_seeds_t" = sum(Num_seeds, na.rm = TRUE)) %>% 
   rename(Year_t = Year) %>% 
   mutate(Year_t = as.numeric(as.character(Year_t)))
 # calculate the number of seedlings recruited in each year
-simple_recruits <- dat_all %>% 
+ipm_A_recruits <- dat_all %>% 
   group_by(Plot_ID, Year) %>% 
   summarize("N_recruits_t" = length(seedling)) %>% 
   rename(Year_t = Year) %>% 
   mutate(Year_tplus1 = as.numeric(as.character(Year_t)) - 1)
 
 #combine # seeds in previous year w/ number of seedlings
-simple_estabs <- simple_seeds %>% 
-  left_join(simple_recruits, 
+ipm_A_estabs <- ipm_A_seeds %>% 
+  left_join(ipm_A_recruits, 
             by = c("Year_t" = "Year_tplus1",
                    "Plot_ID" = "Plot_ID")) %>% 
   dplyr::select(- Year_t.y) %>% 
   rename("N_recruits_tplus1" = "N_recruits_t") %>% 
   mutate("p_estab" = N_recruits_tplus1/N_seeds_t)
   
-simple_estabs[simple_estabs$p_estab == Inf & 
-                is.na(simple_estabs$p_estab) == FALSE , 
+ipm_A_estabs[ipm_A_estabs$p_estab == Inf & 
+                is.na(ipm_A_estabs$p_estab) == FALSE , 
               "p_estab"] <- NA
 
-# the probability of establisshment in the IPM is the average p(estab)
-p.estab.simple = mean(simple_estabs$p_estab, na.rm = TRUE)
+# the probability of establishment in the IPM is the average p(estab)
+p.estab.ipm_A = mean(ipm_A_estabs$p_estab, na.rm = TRUE)
 
 data_list <- list(
   g_int     = coef(sizeMod_all)[1],
@@ -75,13 +67,13 @@ data_list <- list(
   b_slope = coef(seedMod_all)[2],
   c_o_mu    = coef(recMod_all), #recruit size distribution
   c_o_sd    = summary(recMod_all)$sigma,
-  p_estab = p.estab.simple 
+  p_estab = p.estab.ipm_A 
   )
 
 # inital population state
 init_size_state <- runif(500)
 
-simple_ipm <- init_ipm(sim_gen   = "simple", 
+ipm_A <- init_ipm(sim_gen   = "simple", 
                        di_dd     = "di", 
                        det_stoch = "det") %>% 
   define_kernel(
@@ -126,8 +118,8 @@ simple_ipm <- init_ipm(sim_gen   = "simple",
     ) %>% 
   define_domains(
     size = c(
-      min(dat$log_LL_t, na.rm = TRUE) * .8, # lower bound (L)
-      max(dat$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
+      min(dat_all$log_LL_t, na.rm = TRUE) * .8, # lower bound (L)
+      max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
       500 # number of mesh points
     )
     ) %>% 
@@ -138,14 +130,14 @@ simple_ipm <- init_ipm(sim_gen   = "simple",
     iterations = 1000
     )
 
-lambda(simple_ipm)
+lambda(ipm_A)
 
 ## estimate CIs using bootstrap resampling
 ## save the proto-ipm 
-simple_proto <- simple_ipm$proto_ipm
+ipm_A_proto <- ipm_A$proto_ipm
 # lists to hold outputs
-simpleCI_lambdas <- list()
-simpleCI_params <- list()
+ipm_A_CI_lambdas <- list()
+ipm_A_CI_params <- list()
 for(i in 1:1000) {
   ## sample continuous data
   sample_ind <- seq(1, nrow(dat_all), by = 1)
@@ -186,28 +178,28 @@ for(i in 1:1000) {
     b_slope = coef(seedMod_t_now)[2],
     c_o_mu    = coef(recMod_now), #recruit size distribution
     c_o_sd    = summary(recMod_now)$sigma, 
-    p_estab = p.estab.simple
+    p_estab = p.estab.ipm_A
   )
   
   # Insert the new vital rate models into the proto_ipm, then rebuild the IPM.
   
-  parameters(simple_proto) <- data.list_now
+  parameters(ipm_A_proto) <- data.list_now
   
-  boot_ipm <- simple_proto %>%
+  boot_ipm <- ipm_A_proto %>%
     make_ipm(iterate = TRUE,
              normalize_pop_size = FALSE,
              iterations = 100)
   
-  simpleCI_lambdas[i] <- lambda(boot_ipm)
+  ipm_A_CI_lambdas[i] <- lambda(boot_ipm)
   
-  simpleCI_params[[i]] <- data.list_now
+  ipm_A_CI_params[[i]] <- data.list_now
 }
 
 ## calculate 95% CI for lambda
-simpleCI_lambdasVec <- log(sapply(simpleCI_lambdas, unlist))
-SE <- sd(simpleCI_lambdasVec)/sqrt(1000)
-mean <- mean(simpleCI_lambdasVec)
-simpleDI_CI_log <- c((mean - 1.96*SE),(mean + 1.96*SE))
+ipm_A_CI_lambdasVec <- log(sapply(ipm_A_CI_lambdas, unlist))
+SE <- sd(ipm_A_CI_lambdasVec)/sqrt(1000)
+mean <- mean(ipm_A_CI_lambdasVec)
+ipm_A_CI_log <- c((mean - 1.96*SE),(mean + 1.96*SE))
 
 ## check for eviction from the model
 #To check for eviction, we plot the survival model and the column sums of the survival/growth (P) matrix. Eviction occurs when the column sums are lower than the survival models suggests that they should be.
@@ -217,9 +209,9 @@ meshpts <- seq(from = (min(dat$log_LL_t, na.rm = TRUE) * .8), to = (max(dat$log_
 preds <- predict(object = survMod, newdata = data.frame("log_LL_t" = meshpts), type = 'response')
 plot(x = meshpts, y = preds, ylab = "Survival Probability", type = "l")
 # plot the survival values from the P matrix
-points(meshpts,apply(simple_ipm$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
+points(meshpts,apply(ipm_A$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
 
-#### Deterministic, density-independent IPM with CONTINOUS SEEDLINGS ####
+#### Deterministic, density-independent IPM with all sites, all years, all continuous data + seedbank ####
 data_list <- list(
   g_int     = coef(sizeMod_all)[1], # growth 
   g_slope   = coef(sizeMod_all)[2],

@@ -10,10 +10,35 @@ library(lme4)
 library(MASS)
 #### load data from the previous script ####
 # (COBP_IPM_01_dataPrep.R)
-source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
-# dat_all <- read.csv(file = "~/Dropbox/Grad School/Research/Oenothera coloradensis project/Processed_Data/allDat_plus_contSeedlings.csv")
+# source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
+dat_all <- read.csv(file = "~/Dropbox/Grad School/Research/Oenothera coloradensis project/Processed_Data/allDat_plus_contSeedlings.csv")
 
-#### Vital Rate Models for Deterministic, non-density-dependent IPM with all data + continuous seedlings####
+#### calculate seedbank vital rates ####
+## data from Burgess, Hild & Shaw, 2005--NOT using data from MT place, only from FEWAFB
+# Seeds per Capsule (total no., viable and inviable)
+seed_per_cap <- mean(c(2.4, 1.0))
+# Capsule Viability(%) (percentage of capsules that are viable--contain >=1 seed)
+capsule_viab.rt <- mean(c(81, 61, 54))/100
+# Seed Viability (%) (percentage of seeds in a viable capsule that are viable)
+seed_viab.rt <- mean(c(1.9/2.4,  1/1))
+
+## calculate the rate at which a seed produced in a capsule in year t is viable (probability of a viable capsule * probability that a seed inside a viable capsule is viable) 
+total_seed_viab.rt <- capsule_viab.rt * seed_viab.rt
+
+# (data in SeedBagGreenhouseSeedlings.csv)--seeds from previous year
+germ.rt.ours <- .03
+#data from (Burgess, Hild & Shaw, 2005)--seedbank seed viability/germination rate doesn't seem to change much over time-- only from WAFB sites
+germ.rt.Burgess <- mean(c(13.0, 12, 8.3, 7.0, 5.3)/(45 * seed_per_cap))
+
+# germination rate from the Burgess paper incorporates both viability and germination. To isolate just the germination rate, divide the Burgess germination rate by the viability rate
+germ.rt_temp <-germ.rt.Burgess/total_seed_viab.rt  
+# because the Burgess germ.rate was estimated in a greenhouse, and we are confident that field rates are lower, multiply teh Burgess germ.rate by .80
+germ.rt <- germ.rt_temp * .8
+
+# the viability rate (proportion of seeds produced by an adult plant that are viable) is the 'total_seed_viab.rt' derived from the Burgess paper results
+viab.rt <- total_seed_viab.rt
+
+#### Vital Rate Models for Deterministic, density-independent IPM with all data + continuous seedlings####
 ## the dataset is called 'dat_all'
  ### Make vital rate models 
  ## Survival ($s(z)$)
