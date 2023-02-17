@@ -130,7 +130,7 @@ ipm_A <- init_ipm(sim_gen   = "simple",
     iterations = 1000
     )
 
-ln_lambda_ipm_A <- log(lambda(ipm_A))
+lambda(ipm_A)
 
 ## estimate CIs using bootstrap resampling
 ## save the proto-ipm 
@@ -213,6 +213,7 @@ points(meshpts,apply(ipm_A$sub_kernels$P,2,sum),col="red",lwd=3,cex=.1,pch=19)
 
 #### IPM B ####
 ### Deterministic, density-independent IPM with all sites, all years, all continuous data + seedbank ###
+
 data_list <- list(
   g_int     = coef(sizeMod_all)[1], # growth 
   g_slope   = coef(sizeMod_all)[2],
