@@ -11,7 +11,7 @@ library(MASS)
 #### load data from the previous script ####
 # (COBP_IPM_01_dataPrep.R)
 # source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
-dat_all <- read.csv(file = "~/Dropbox/Grad School/Research/Oenothera coloradensis project/Processed_Data/allDat_plus_contSeedlings.csv")
+dat_all <- read.csv(file = "~/Dropbox/Work/Grad School/Research/Oenothera coloradensis project/Processed_Data/allDat_plus_contSeedlings.csv")
 
 #### calculate seedbank vital rates ####
 ## data from Burgess, Hild & Shaw, 2005--NOT using data from MT place, only from FEWAFB

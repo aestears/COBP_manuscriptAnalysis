@@ -7,6 +7,7 @@
 #### load vital rate models from previous script ####
 source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
 
+# DAVE LOOK HERE# 
 #### hand-calculated model for continuous-ized seedlings and discrete seedbank (IPM B) ####
 # Density Independent 
 
