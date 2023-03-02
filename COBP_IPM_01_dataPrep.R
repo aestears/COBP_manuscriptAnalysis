@@ -438,6 +438,7 @@ N_dat <- left_join(N_dat, N_site)
 dat_all <- dat_all  %>% 
   left_join(N_dat)
 
+dat_all[dat_all$Site == "Meadow" & dat_all$Year == 2018, "N_Site_t"] <- 74
 # # write the discreteDat d.f to file
 write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
 # # also write the continuous seedling d.f to file

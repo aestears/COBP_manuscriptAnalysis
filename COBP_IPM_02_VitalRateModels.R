@@ -272,8 +272,7 @@ viab.rt <- total_seed_viab.rt
  # start for-loop to fit models
  for (i in 1:length(siteNames)) {
    # make a list to hold models for this site
-   temp_mod_list <- list()
-   temp_mod_list[1:5] <- NA
+   temp_mod_list <- vector(mode = "list", length = 5)
    # get the name of the site
    site_now <- siteNames[i]
    
@@ -288,6 +287,7 @@ viab.rt <- total_seed_viab.rt
    ## fit growth model
    # get all data, but just for this site
    allDat_now <- dat_all[dat_all$Site == site_now,]
+   
    # fit model and store in a list
    temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + N_Site_t, data = allDat_now)
    names(temp_mod_list)[2] <- paste0("growth")
@@ -693,7 +693,7 @@ for (i in 1:length(siteNames)) {
                        dat_all$Site == site_now,]
   # fit model and store in list
   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + tMean_grow_C_s +  
-                              SoilTemp_grow_C_s + N_all_t, 
+                              SoilTemp_grow_C_s + N_Site_t, 
                             data = survDat_now, 
                             family = binomial)
   names(temp_mod_list)[1] <- paste0("surv")
@@ -703,7 +703,7 @@ for (i in 1:length(siteNames)) {
   allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + tMean_grow_C_s +  
-                              N_all_t, 
+                              N_Site_t, 
                            data = allDat_now)
   names(temp_mod_list)[2] <- paste0("growth")
   
@@ -724,7 +724,7 @@ for (i in 1:length(siteNames)) {
   ## distribution of recruit size
   recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
                     dat_all$Site == site_now,]
-  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + SoilMoisture_m3m3_s + N_all_t, data = recD_now)
+  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + SoilMoisture_m3m3_s + N_Site_t, data = recD_now)
   names(temp_mod_list)[5] <- paste0("recruitDist")
   
   ## store the temporary model list in the appropriate slot of the 'det_DI_mods' list

@@ -7,6 +7,7 @@
 # load required packages
 library(tidyverse)
 library(ipmr)
+
 #### load vital rate models from previous script ####
 load(file = "./analysis_scripts/analysis_scripts/ipm_results.RData")
 source(file = "./analysis_scripts/COBP_IPM_04_ellnerCodeSimpleIPMs.R")
