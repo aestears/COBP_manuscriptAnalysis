@@ -10,8 +10,9 @@ library(lme4)
 library(MASS)
 #### load data from the previous script ####
 # (COBP_IPM_01_dataPrep.R)
-# source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
-dat_all <- read.csv(file = "~/Dropbox/Work/Grad School/Research/Oenothera coloradensis project/Processed_Data/allDat_plus_contSeedlings.csv")
+#source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
+dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
+discDat <- read.csv(file = "../Processed_Data/discreteStageData.csv")
 
 #### calculate seedbank vital rates ####
 ## data from Burgess, Hild & Shaw, 2005--NOT using data from MT place, only from FEWAFB
@@ -227,7 +228,7 @@ viab.rt <- total_seed_viab.rt
    
    ## fit survival model
    # get data only for plants that didn't flower
-   survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
+   survDat_now <- dat_all[(dat_all$flowering==0 | is.na(dat_all$flowering)) & 
                         dat_all$Site == site_now,]
    # fit model and store in list
    temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t , data = survDat_now, family = binomial)
@@ -268,7 +269,7 @@ viab.rt <- total_seed_viab.rt
  det_DD_mods <- list()
  det_DD_mods[1:6] <- NA
  # make a vector of site names
- siteNames <- unique(dat$Site)
+ siteNames <- unique(dat_all$Site)
  # start for-loop to fit models
  for (i in 1:length(siteNames)) {
    # make a list to hold models for this site
@@ -278,7 +279,7 @@ viab.rt <- total_seed_viab.rt
    
    ## fit survival model
    # get data only for plants that didn't flower
-   survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
+   survDat_now <- dat_all[(dat_all$flowering==0 | is.na(dat_all$flowering)) & 
                         dat_all$Site == site_now,]
    # fit model and store in list
    temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + N_Site_t, data = survDat_now, family = binomial)

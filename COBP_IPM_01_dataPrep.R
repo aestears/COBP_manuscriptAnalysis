@@ -405,6 +405,10 @@ for (i in 1:length(plots)) {
 # put in a 'discrete' stage d.f
 discDat <- seeds.out
 
+## add site names
+siteLookUp <- unique(dat_all[,c("Site", "Plot_ID")])
+discDat <- discDat %>% 
+  left_join(siteLookUp)
 ## double check that data in dat_all are correct
 # make sure log(longest leaf) is calculated for all plants
 dat_all$log_LL_t <- log(dat_all$LongestLeaf_cm)
@@ -440,6 +444,6 @@ dat_all <- dat_all  %>%
 
 dat_all[dat_all$Site == "Meadow" & dat_all$Year == 2018, "N_Site_t"] <- 74
 # # write the discreteDat d.f to file
-write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
-# # also write the continuous seedling d.f to file
-write.csv(x = dat_all, file = "../Processed_Data/allDat_plus_contSeedlings.csv", row.names = FALSE)
+# write.csv(x = discDat, file = "../Processed_Data/discreteStageData.csv", row.names = FALSE)
+# # # also write the continuous seedling d.f to file
+# write.csv(x = dat_all, file = "../Processed_Data/allDat_plus_contSeedlings.csv", row.names = FALSE)
