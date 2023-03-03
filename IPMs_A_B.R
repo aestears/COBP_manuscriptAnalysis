@@ -324,7 +324,7 @@ ipm_B <- init_ipm(sim_gen   = "general",
   ) %>% 
   define_pop_state(
     n_size = runif(500),
-    n_b = 400, 
+    n_b = 200, 
     
   ) %>% 
   make_ipm(
