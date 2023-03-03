@@ -702,7 +702,7 @@ for (i in 1:length(siteNames)) {
   # get all data, but just for this site
   allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
-  temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + tMean_grow_C_s +  
+  temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  
                               N_Site_t, 
                            data = allDat_now)
   names(temp_mod_list)[2] <- paste0("growth")

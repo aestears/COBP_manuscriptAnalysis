@@ -667,6 +667,9 @@ for (i in 1:length(sites)) {
 
 #### IPM S - IPM X ####
 ### stochastic, density dependent IPM for each plot  ###
+# make a list to hold the IPMs
+IPM_S_X_list <-  vector(mode = 'list', length = length(sites))
+
 # define environmental covariates
 env_params <- list(
   soilM_mu = mean(dat$SoilMoisture_m3m3_s), # use a normal dist for soilM (?)
@@ -688,7 +691,7 @@ sample_env <- function(env_params) {
   temp_now  <- rnorm(1, mean = env_params$temp_mu, sd = env_params$temp_sd)
   precip_now <- rnorm(1, mean = env_params$precip_mean, sd  = env_params$precip_sd)
   
-  out        <- list(soilM = soilM_now, soilT = soilT_now, temp = temp_now, precip = precip_now)
+  out <- list(soilM = soilM_now, soilT = soilT_now, temp = temp_now, precip = precip_now)
   return(out)
 }
 # make for-loop
@@ -703,8 +706,7 @@ for (i in 1:length(sites)) {
     g_int     = coef(modList_now$growth)[1],
     g_slope   = coef(modList_now$growth)[2],
     g_soilM   = coef(modList_now$growth)[3], 
-    g_temp    = coef(modList_now$growth)[4],
-    g_dd      = coef(modList_now$growth)[5],
+    g_dd    = coef(modList_now$growth)[4],
     g_sd      = summary(modList_now$growth)$sigma,
     s_int     = coef(modList_now$surv)[1],
     s_slope   = coef(modList_now$surv)[2],
@@ -854,7 +856,7 @@ for (i in 1:length(sites)) {
              usr_funs = list(inv_logit = inv_logit), return_main_env = TRUE )
   
   ## rename the ipm object to have the name of site
-  assign(paste0(site_now,"__stoch_DD_ipm"), value = temp_ipm)
+  IPM_S_X_list[[i]] <- assign(paste0(site_now,"__stoch_DD_ipm"), value = temp_ipm)
   
   ## Done!
 }
