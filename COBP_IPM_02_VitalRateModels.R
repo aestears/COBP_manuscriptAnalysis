@@ -128,29 +128,29 @@ viab.rt <- total_seed_viab.rt
  # subset the data to exclude flowering individuals
  survDat_N <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering),]
  # logistic glm with log-transformed size_t
- survMod_N <- glm(survives_tplus1 ~ log_LL_t + N_all , data = survDat_N, family = binomial)
+ survMod_N <- glm(survives_tplus1 ~ log_LL_t + N_all_plot , data = survDat_N, family = binomial)
  summary(survMod_N)
  # plot model results 
  plot(survives_tplus1 ~ log_LL_t, data = survDat_N)
  newdata <- data.frame("log_LL_t" = seq(from = min(survDat_N$log_LL_t, na.rm = TRUE), 
                                         to = max(survDat_N$log_LL_t, na.rm = TRUE),
                                         length.out = 100),  
-                       "N_all" = seq(from = min(survDat_N$N_all, na.rm = TRUE),
-                                     to = max(survDat_N$N_all, na.rm = TRUE), 
+                       "N_all_plot" = seq(from = min(survDat_N$N_all_plot, na.rm = TRUE),
+                                     to = max(survDat_N$N_all_plot, na.rm = TRUE), 
                                      length.out = 100))
  lines(x = newdata$log_LL_t, y = predict(object = survMod_N, newdata =  newdata, type = "response"), col = "red")
  
  ## Growth ($G(z',z)$)
  # lm w/ log-transformed size_t and size_t+1
- sizeMod_N <- lm(log_LL_tplus1 ~ log_LL_t + N_all, data = dat_all)
+ sizeMod_N <- lm(log_LL_tplus1 ~ log_LL_t + N_all_plot, data = dat_all)
  summary(sizeMod_N)
  # plot model results
  plot(log_LL_tplus1 ~ log_LL_t, data = dat_all)
  newdata <- data.frame("log_LL_t" = seq(from = min(dat_all$log_LL_t, na.rm = TRUE), 
                                         to = max(dat_all$log_LL_t, na.rm = TRUE),
                                         length.out = 100),
-                       "N_all" = seq(from = min(dat_all$N_all, na.rm = TRUE),
-                                     to = max(dat_all$N_all, na.rm = TRUE),
+                       "N_all_plot" = seq(from = min(dat_all$N_all_plot, na.rm = TRUE),
+                                     to = max(dat_all$N_all_plot, na.rm = TRUE),
                                      length.out = 100))
  lines(x = newdata$log_LL_t, y = predict(object = sizeMod_N, newdata =  newdata), col = "red")
  lines(x = c(-1,4), y = c(-1,4), col = "darkgrey", lty = 2)
@@ -171,7 +171,7 @@ viab.rt <- total_seed_viab.rt
  ## Flowering probability ($p_b(z)$)
  # using size in current year (w/ squared term)
  # logistic glm with log-transformed size_t
- flwrMod_N <- suppressWarnings(glm(flowering ~ log_LL_t + I(log_LL_t^2) + N_all,
+ flwrMod_N <- suppressWarnings(glm(flowering ~ log_LL_t + I(log_LL_t^2) + N_all_plot,
                                     data = dat_all, family = binomial))
  summary(flwrMod_N)
  # plot model results 
@@ -179,10 +179,9 @@ viab.rt <- total_seed_viab.rt
  newdata <- data.frame("log_LL_t" = seq(from = min(dat_all$log_LL_t, na.rm = TRUE), 
                                         to = max(dat_all$log_LL_t, na.rm = TRUE),
                                         length.out = 100),
-                       "N_all" = seq(from = min(dat_all$N_all, na.rm = TRUE),
-                                     to = max(dat_all$N_all, na.rm = TRUE),
-                                     length.out = 100)
-                       )
+                       "N_all_plot" = seq(from = min(dat_all$N_all_plot, na.rm = TRUE),
+                                     to = max(dat_all$N_all_plot, na.rm = TRUE), length.out = 100))
+
  lines(x = newdata$log_LL_t, y = predict(object = flwrMod_N, newdata =  newdata, type = "response"), col = "red")
  
  ## Distribution of recruit size ($c_o(z')$)
@@ -446,27 +445,27 @@ summary(recMod_env)
 # data: survDat_all
 dat$log_LL_t_s <- scale(dat$log_LL_t)
 # logistic glm with log-transformed size_t
-survMod_e_dd <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_t + (1|Plot_ID), data = survDat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+survMod_e_dd <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_plot + (1|Plot_ID), data = survDat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(survMod_e_dd)
 # try excluding the precip data (is not significant in the previous model)
-survMod_e_dd_1 <- glmer(survives_tplus1 ~ log_LL_t + tMean_grow_C_s + N_all_t +  (1|Plot_ID),  data = survDat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+survMod_e_dd_1 <- glmer(survives_tplus1 ~ log_LL_t + tMean_grow_C_s + N_all_plot +  (1|Plot_ID),  data = survDat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(survMod_e_dd_1)
 ## survMod_e_1 is the better fit, use this model
 survMod_env_dd <- survMod_e_dd_1
 
 ## Growth ($G(z',z)$)
 # lm w/ log-transformed size_t and size_t+1
-sizeMod_e_dd <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_t + (1|Plot_ID), data = dat_all)
+sizeMod_e_dd <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_plot + (1|Plot_ID), data = dat_all)
 summary(sizeMod_e_dd)
 # remove soilTemp in winter and growing season; drop precip
-sizeMod_e_dd_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + N_all_t + (1|Plot_ID), data = dat_all)
+sizeMod_e_dd_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + N_all_plot + (1|Plot_ID), data = dat_all)
 summary(sizeMod_e_dd_1)
 sizeMod_env_dd <- sizeMod_e_dd_1
 
 ## Number of seeds produced, according to plant size ($b(z)$)
 # data: seedDat 
 # fit poisson glm (for count data)
-seedMod_e_dd <- lme4::glmer.nb(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s +  N_all_t + (1|Plot_ID), data = seedDat_all, family = poisson)
+seedMod_e_dd <- lme4::glmer.nb(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s +  N_all_plot + (1|Plot_ID), data = seedDat_all, family = poisson)
 summary(seedMod_e_dd)
 # remove soil moisture, soil temp grow, soil temp winter (not significant)
 seedMod_e_dd_1 <- lme4::glmer.nb(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID) , data = seedDat_all, family = poisson)
@@ -477,7 +476,7 @@ seedMod_env_dd <- seedMod_e_dd_1
 ## Flowering probability ($p_b(z)$)
 # using size in current year (w/ squared term)
 # logistic glm with log-transformed size_t
-flwrMod_e_dd <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  +  N_all_t + (1|Plot_ID), data = dat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
+flwrMod_e_dd <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  +  N_all_plot + (1|Plot_ID), data = dat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(flwrMod_e_dd)
 # remove density dependence
 flwrMod_e_dd_1 <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  + (1|Plot_ID), data = dat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
@@ -488,7 +487,7 @@ flwrMod_env_dd <- flwrMod_e_dd
 ## Distribution of recruit size ($c_o(z')$)
 # data = recD
 # fit the model
-recMod_env_dd <- lmer(log_LL_t ~ SoilMoisture_m3m3_s + N_all_t + (1|Plot_ID), data = recD_all)
+recMod_env_dd <- lmer(log_LL_t ~ SoilMoisture_m3m3_s + N_all_plot + (1|Plot_ID), data = recD_all)
 summary(recMod_env_dd)
 #plot the results
 
@@ -579,14 +578,14 @@ for (i in 1:length(siteNames)) {
   survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
                        dat_all$Site == site_now,]
   # fit model and store in list
-  temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + N_all_t, data = survDat_now, family = binomial)
+  temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + N_all_plot, data = survDat_now, family = binomial)
   names(temp_mod_list)[1] <- paste0("surv")
   
   ## fit growth model
   # get all data, but just for this site
   allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
-  temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + N_all_t, data = allDat_now)
+  temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + N_all_plot, data = allDat_now)
   names(temp_mod_list)[2] <- paste0("growth")
   
   ## number of seeds produced, according to plant size
@@ -602,7 +601,7 @@ for (i in 1:length(siteNames)) {
   ## distribution of recruit size
   recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
                     dat_all$Site == site_now,]
-  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + N_all_t, data = recD_now)
+  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + N_all_plot, data = recD_now)
   names(temp_mod_list)[5] <- paste0("recruitDist")
   
   ## store the temporary model list in the appropriate slot of the 'det_DI_mods' list
@@ -694,7 +693,7 @@ for (i in 1:length(siteNames)) {
                        dat_all$Site == site_now,]
   # fit model and store in list
   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + tMean_grow_C_s +  
-                              SoilTemp_grow_C_s + N_Site_t, 
+                              SoilTemp_grow_C_s + N_all_plot, 
                             data = survDat_now, 
                             family = binomial)
   names(temp_mod_list)[1] <- paste0("surv")
@@ -704,7 +703,7 @@ for (i in 1:length(siteNames)) {
   allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  
-                              N_Site_t, 
+                              N_all_plot, 
                            data = allDat_now)
   names(temp_mod_list)[2] <- paste0("growth")
   
@@ -725,7 +724,7 @@ for (i in 1:length(siteNames)) {
   ## distribution of recruit size
   recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
                     dat_all$Site == site_now,]
-  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + SoilMoisture_m3m3_s + N_Site_t, data = recD_now)
+  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + SoilMoisture_m3m3_s + N_all_plot, data = recD_now)
   names(temp_mod_list)[5] <- paste0("recruitDist")
   
   ## store the temporary model list in the appropriate slot of the 'det_DI_mods' list
@@ -733,40 +732,3 @@ for (i in 1:length(siteNames)) {
   names(stoch_DD_mods)[i] <- site_now
 }
 ## use uniform p.estab, outSB, staySB, and goSB estimates 
-
-##### modeling pop.size in t+1 as a function of size in year t ####
-# use the 'N_dat' data.frame
-# add a column for N_site_tplus1
-N_dat$N_Site_tplus1 <- NA
-for(i in unique(N_dat$Plot_ID)) {
-  N_dat[N_dat$Plot_ID == i,"N_Site_tplus1"] <-  c(N_dat[N_dat$Plot_ID == i,]$N_Site_t[2:3], NA)
-}
-
-## use a Poisson model
-dd_mod <- glm(N_Site_tplus1 ~ N_Site_t, dat = N_dat, family = "poisson")
-# check for overdisperson
-3710.2/34 # 109.123 -- yikes, super overdispersed
-## use a negative binomial instead
-dd_nb.mod <- MASS::glm.nb(N_Site_tplus1 ~ N_Site_t, dat = N_dat)
-plot(x = N_dat$N_Site_t, y = N_dat$N_Site_tplus1)
-newdata <- data.frame("N_Site_t" = seq(from = min(N_dat$N_Site_t, na.rm = TRUE), 
-                                       to = max(N_dat$N_Site_t, na.rm = TRUE),
-                                       length.out = 100))
-lines(x = newdata$N_Site_t, y = predict(object = dd_nb.mod, newdata =  newdata, type = "response"), col = "red")
-
-# 
-# census <- read.csv("~/Dropbox/Grad School/Research/Oenothera coloradensis project/Raw Data/fewafb_SiteCensus_2021.csv", header = TRUE)
-# names(census) <- c("Site", 2002:2021)
-# census <- census %>% 
-#   pivot_longer(cols = names(census)[2:21], names_to = "Year", values_to = "N_t")
-# census$N_tplus1 <- NA
-# for(i in unique(census$Site)) {
-#   census[census$Site == i,"N_tplus1"] <-  c(census[census$Site == i,]$N_t[2:20], NA)
-# }
-# ddCensus_nb.mod <- MASS::glm.nb(N_tplus1 ~ N_t + Site, dat = census)
-# plot(x = census$N_t, y = census$N_tplus1)
-# newdata <- data.frame("N_t" = seq(from = min(census$N_t, na.rm = TRUE), 
-#                                        to = max(census$N_t, na.rm = TRUE),
-#                                        length.out = 100),
-#                       "Site" = "Diamond")
-# lines(x = newdata$N_t, y = predict(object = ddCensus_nb.mod, newdata =  newdata, type = "response"), col = "red")
