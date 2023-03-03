@@ -10,7 +10,7 @@ library(tidyverse)
 
 #### Load Data ####
 # location of data files 
-datFolder <- "/Users/alicestears/Dropbox/Grad School/Research/Oenothera coloradensis project"
+datFolder <- "/Users/alicestears/Dropbox/Work/Grad School/Research/Oenothera coloradensis project"
 ## load continuous data
 dat <- read.csv(paste0(datFolder, "/Processed_Data/COBP_long_CURRENT.csv"),
                 sep = ",") 
