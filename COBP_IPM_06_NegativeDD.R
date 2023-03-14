@@ -13,13 +13,13 @@ library(ggpubr)
 # load data from script 1
 dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
 
+### IPMs for this analysis are in the "03_IPMs_C_N.R" file 
 #### save the data to file ####
 ## site-level DI IPM matrices
 saveRDS(site_IPMs_DI, file = '/Users/astears/COBP_project/site_level_IPMs/site_level_DI_IPMs')
 ## site-level DI bootstrap CI data
 saveRDS(siteDI_bootCI_lambdas, file = "/Users/astears/COBP_project/site_level_IPMs/site_level_DI_bootCI_lambdas")
 saveRDS(siteDI_bootCI_params, file = "/Users/astears/COBP_project/site_level_IPMs/site_level_DI_bootCI_params")
-
 
 ## site-level DD IPM matrices
 saveRDS(site_IPMs_DD, file = '/Users/astears/COBP_project/site_level_IPMs/site_level_DD_IPMs')
