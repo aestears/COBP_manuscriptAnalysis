@@ -556,3 +556,18 @@ site_secondDI_CI <- lapply(IPMs_II_NN_bootCI_lambdas,
 names(site_secondDI_CI) <- unique(dat_all$Site)
 lapply(IPMs_II_NN_bootCI_lambdas, 
        FUN = function(x) log(mean(x)))
+
+
+#### save the data to file ####
+fileLoc <- "./intermediate_analysis_Data/site_level_IPMs_eachYear/"
+## site-level DI IPM matrices
+saveRDS(IPMs_CC_HH, file = paste0(fileLoc,"/IPMs_CC_HH.RDS"))
+## site-level DI bootstrap CI data
+saveRDS(IPMs_CC_HH_bootCI_lambdas, file = paste0(fileLoc,"/IPMs_CC_HH_bootCI_lambdas.RDS"))
+saveRDS(IPMs_CC_HH_bootCI_params, file = paste0(fileLoc,"/IPMs_CC_HH_bootCI_params.RDS"))
+
+## site-level DD IPM matrices
+saveRDS(IPMs_II_NN, file = paste0(fileLoc,"/IPMs_II_NN.RDS"))
+## site-level DD bootstrap CI data
+saveRDS(IPMs_II_NN_bootCI_lambdas, file = paste0(fileLoc, "/IPMs_II_NN_bootCI_lambdas.RDS"))
+saveRDS(IPMs_II_NN_bootCI_params, file = paste0(fileLoc, "/IPMs_II_NN_bootCI_params.RDS"))
