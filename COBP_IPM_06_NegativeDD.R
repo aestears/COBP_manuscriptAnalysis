@@ -14,29 +14,31 @@ library(ggpubr)
 dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
 
 ### IPMs for this analysis are in the "03_IPMs_C_N.R" file 
-#### save the data to file ####
+#### read in data saved to file ####
+fileLoc <- "./intermediate_analysis_Data/site_level_IPMs_allYears/"
+
 ## site-level DI IPM matrices
-saveRDS(site_IPMs_DI, file = '/Users/astears/COBP_project/site_level_IPMs/site_level_DI_IPMs')
+IPMs_C_H <- readRDS(file = paste0(fileLoc,"/IPMs_C_H.RDS"))
 ## site-level DI bootstrap CI data
-saveRDS(siteDI_bootCI_lambdas, file = "/Users/astears/COBP_project/site_level_IPMs/site_level_DI_bootCI_lambdas")
-saveRDS(siteDI_bootCI_params, file = "/Users/astears/COBP_project/site_level_IPMs/site_level_DI_bootCI_params")
+IPMs_C_H_bootCI_lambdas <- readRDS(file = paste0(fileLoc,"/IPMs_C_H_bootCI_lambdas.RDS"))
+IPMs_C_H_bootCI_params <- readRDS(file = paste0(fileLoc,"/IPMs_C_H_bootCI_params.RDS"))
 
 ## site-level DD IPM matrices
-saveRDS(site_IPMs_DD, file = '/Users/astears/COBP_project/site_level_IPMs/site_level_DD_IPMs')
+IPMs_I_N <- readRDS(file = paste0(fileLoc,"/IPMs_I_N.RDS"))
 ## site-level DD bootstrap CI data
-saveRDS(siteDD_bootCI_lambdas, file = "/Users/astears/COBP_project/site_level_IPMs/site_level_DD_bootCI_lambdas")
-saveRDS(siteDD_bootCI_params, file = "/Users/astears/COBP_project/site_level_IPMs/site_level_DD_bootCI_params")
+IPMs_I_N_bootCI_lambdas <- readRDS(file = paste0(fileLoc, "/IPMs_I_N_bootCI_lambdas.RDS"))
+IPMs_I_N_bootCI_params <- readRDS(file = paste0(fileLoc, "/IPMs_I_N_bootCI_params.RDS"))
 
 #### calculate 95% confidence intervals for lambdas ####
 ## DI lambda CIs
 ## calculate 95% CI for lambdas
-DI_lams_CIs <- as.data.frame(lapply(X = siteDI_bootCI_lambdas, FUN = function(x) 
+DI_lams_CIs <- as.data.frame(lapply(X = IPMs_C_H_bootCI_lambdas, FUN = function(x) 
   c(log(mean(x) - 1.96*(sd(x)/sqrt(1000))),log(mean(x) + 1.96*(sd(x)/sqrt(1000))))
   ))
 names(DI_lams_CIs) <- unique(dat_all$Site)
 
 ## DD lambda CIs
-DD_lams_CIs <- as.data.frame(lapply(X = siteDD_bootCI_lambdas, FUN = function(x) 
+DD_lams_CIs <- as.data.frame(lapply(X = IPMs_I_N_bootCI_lambdas, FUN = function(x) 
   c(log(mean(x) - 1.96*(sd(x)/sqrt(1000))),log(mean(x) + 1.96*(sd(x)/sqrt(1000))))
 ))
 names(DD_lams_CIs) <- unique(dat_all$Site)
