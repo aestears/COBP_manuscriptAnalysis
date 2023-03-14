@@ -153,55 +153,67 @@ subPop_AIC_compare$type <- c("DI", "DD", "DI-DD")
 ## these data go into Table 4
 
 #### compare lambdas and subpop N ####
-# read in site-level IPMs
-site_IPMs_DI <- readRDS("./intermediate_analysis_Data/site_level_IPMs_allYears/site_level_DI_IPMs.RDS")
-site_IPMs_DD <- readRDS("./intermediate_analysis_Data/site_level_IPMs_allYears/site_level_DD_IPMs.RDS")
+## site-level IPM matrices are read in preivously in this script as "IPMs_C_H" (DI models) and 
+# "IPMs_I_N" (DD models)
 
 # calculate lambdas
-siteDI_lams <- sapply(site_IPMs_DI, function(x) as.numeric(eigen(x)$values[1]))
+siteDI_lams <- sapply(IPMs_C_H, function(x) as.numeric(eigen(x)$values[1]))
 siteDI_lams <- data.frame("Site" = names(siteDI_lams), "log_lambda" = log(siteDI_lams), "type" = "DI")
-siteDD_lams <- sapply(site_IPMs_DD, function(x) as.numeric(eigen(x)$values[1]))
+siteDD_lams <- sapply(IPMs_I_N, function(x) as.numeric(eigen(x)$values[1]))
 siteDD_lams <- data.frame("Site" = names(siteDD_lams), "log_lambda" = log(siteDD_lams), "type" = "DD")
 
 site_lams <- rbind(siteDI_lams, siteDD_lams)
 
 ## get lambdas from each year and each site
-byYear_DI_lams <- data.frame(
-  "Site" = c("Unnamed_Creek", "Diamond_Creek", "Crow_Creek", "Meadow", "HQ3", "HQ5"), 
-  "Year" = as.factor(c(rep(2018, length.out = 6), rep(2019, length.out = 6))),
-  "lambda" = c(0.16, 1.21, 0.62, 0.38, 0.51, 0.82, 0.26, 0.48, 0.46, 0.20, -0.10, -0.19)
-                             )
+# have to read in IPMs from file ("IPMs_CC_HH" are DI models for 2018-2019; "IPMs_II_NN" are DI models for 2019-2020)
+fileLoc <- "./intermediate_analysis_Data/site_level_IPMs_eachYear/"
+## site-level DI IPM matrices for 2018-2019
+IPMs_CC_HH <- readRDS(file = paste0(fileLoc,"/IPMs_CC_HH.RDS"))
+## site-level DI IPM matrices for 2019-2020
+IPMs_II_NN <- readRDS(file = paste0(fileLoc,"/IPMs_II_NN.RDS"))
 
-N_site <- unique(dat[,c("Site", "Year", "N_all_t")]) %>% 
-  group_by(Site, Year) %>% 
-  summarize(N_all_t = sum(N_all_t))
+## calculate lambdas
+# 2018-2019
+siteDI_firstYr_lams <- sapply(IPMs_CC_HH, function(x) as.numeric(eigen(x)$values[1]))
+siteDI_firstYr_lams <- data.frame("Site" = names(siteDI_firstYr_lams), "log_lambda" = unname(log(siteDI_firstYr_lams)), "type" = "DI", "Year" = 2018)
+# 2019-2020
+siteDI_secondYr_lams <- sapply(IPMs_II_NN, function(x) as.numeric(eigen(x)$values[1]))
+siteDI_secondYr_lams <- data.frame("Site" = names(siteDI_secondYr_lams), "log_lambda" = unname(log(siteDI_secondYr_lams)), "type" = "DI", "Year" = 2019)
+
+byYear_DI_lams <- rbind(siteDI_firstYr_lams, siteDI_secondYr_lams)
+
+# get values for population size for each site in each year
+N_site <- unique(dat_all[,c("Site", "Year", "N_Site_t")]) 
 
 # calculate N_all_tplus1
-N_site$N_all_tplus1 <- NA
+N_site$N_Site_tplus1 <- NA
 for (i in 1:length(unique(N_site$Site))) {
-  N_site[N_site$Site == unique(N_site$Site)[i], "N_all_tplus1"] <- 
-    c(N_site[N_site$Site == unique(N_site$Site)[i], ]$N_all_t[2:3], NA)
+  N_site[N_site$Site == unique(N_site$Site)[i], "N_Site_tplus1"] <- 
+    c(N_site[N_site$Site == unique(N_site$Site)[i], ]$N_Site_t[2:3], NA)
 }
 
 lam_N <- left_join(site_lams, N_site)
 
 byYear_DI_lams <- byYear_DI_lams %>% 
   left_join(N_site)
+
 # add data from Floyd thesis 
 byYear_DI_lams <- rbind( byYear_DI_lams, data.frame(Site = c("Crow_Creek", "Unnamed_Creek", "Diamond_Creek"), 
+           log_lambda = log(c(1.36, 1.02, 1.24)),
+           type = "DI",
            Year = as.factor(1993),
-           lambda = log(c(1.36, 1.02, 1.24)),
-           N_all_t = c(435, 550, 590),
-           N_all_tplus1 = c(368, 581, 658)),
+           N_Site_t = c(435, 550, 590),
+           N_Site_tplus1 = c(368, 581, 658)),
 data.frame(Site = c("Crow_Creek", "Unnamed_Creek", "Diamond_Creek"), 
+           log_lambda = log(c(1.23, 2.04, 1.67)),
+           type = "DI",
            Year = as.factor(1992),
-           lambda = log(c(1.23, 2.04, 1.67)),
-           N_all_t = c(233, 355, 375),
-           N_all_tplus1 = c(435, 550, 590)))
+           N_Site_t = c(233, 355, 375),
+           N_Site_tplus1 = c(435, 550, 590)))
 
-# model comparing log(lambda) and N_all_t, w/ a fixed effect of Site to account for different pop sizes between sites
-mod <- (lm(lambda ~ N_all_t + Site, data = byYear_DI_lams))
-newdata <- data.frame(N_all_t = rep(seq(min(byYear_DI_lams$N_all_t), max(byYear_DI_lams$N_all_t), length.out = 20), 6), Site = c(rep(unique(byYear_DI_lams$Site)[1],length.out = 20), 
+# model comparing log(lambda) and N_Site_t, w/ a fixed effect of Site to account for different pop sizes between sites
+mod <- (lm(log_lambda ~ N_Site_t + Site, data = byYear_DI_lams))
+newdata <- data.frame(N_Site_t = rep(seq(min(byYear_DI_lams$N_Site_t), max(byYear_DI_lams$N_Site_t), length.out = 20), 6), Site = c(rep(unique(byYear_DI_lams$Site)[1],length.out = 20), 
                 rep(unique(byYear_DI_lams$Site)[2],length.out = 20), 
                 rep(unique(byYear_DI_lams$Site)[3],length.out = 20), 
                 rep(unique(byYear_DI_lams$Site)[4],length.out = 20), 
@@ -210,39 +222,37 @@ newdata <- data.frame(N_all_t = rep(seq(min(byYear_DI_lams$N_all_t), max(byYear_
                       )
 modPreds <- predict(mod, newdata = newdata, interval = "confidence")
 modPreds <- as.data.frame(modPreds)
-modPreds$N_all_t <- newdata$N_all_t
+modPreds$N_Site_t <- newdata$N_Site_t
 modPreds$Site <- newdata$Site
 modPreds <- modPreds %>% 
-  group_by(N_all_t) %>% 
+  group_by(N_Site_t) %>% 
   summarize(fit = mean(fit), 
             lwr = mean(lwr), 
             upr = mean(upr))
 # plot DI subpop-level lambdas for each transition according to size in year_t
 logLambda_nt_figure <- ggplot(data = byYear_DI_lams) + 
-  #geom_ribbon(aes(x = log(N_all_t), ymin = lwr, ymax = upr), data = modPreds, col = "lightgrey", fill = "lightgrey", alpha = .5) +
-  #geom_line(aes(x = log(N_all_t), y = fit), data = modPreds, lty = 2, lwd = 1) +
-  geom_point(aes(x = log(N_all_t), y = lambda, col = Site)) + 
-  geom_smooth(aes(x = log(N_all_t), y = lambda, col = Site), se = FALSE, method = "lm", lty = 1, lwd = .75) +
+  #geom_ribbon(aes(x = log(N_Site_t), ymin = lwr, ymax = upr), data = modPreds, col = "lightgrey", fill = "lightgrey", alpha = .5) +
+  #geom_line(aes(x = log(N_Site_t), y = fit), data = modPreds, lty = 2, lwd = 1) +
+  geom_point(aes(x = log(N_Site_t), y = log_lambda, col = Site)) + 
+  geom_smooth(aes(x = log(N_Site_t), y = log_lambda, col = Site), se = FALSE, method = "lm", lty = 1, lwd = .75) +
   xlab(expression(paste("log(N ", italic(t),")"))) +
   scale_color_brewer(type = "qual", palette = "Dark2") +
   ylab(expression(paste("log(", lambda,"), year ", italic(t)))) +
   theme_classic()
 
 # get slopes of line for each site
-slopeDist <- c(coefficients(lm(lambda ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Crow_Creek",]))[2],
-coefficients(lm(lambda ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Diamond_Creek",]))[2],
-coefficients(lm(lambda ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ3",]))[2],
-coefficients(lm(lambda ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ5",]))[2],
-coefficients(lm(lambda ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Meadow",]))[2],
-coefficients(lm(lambda ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Unnamed_Creek",]))[2])
+slopeDist <- c(coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Crow_Creek",]))[2],
+coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Diamond_Creek",]))[2],
+coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ3",]))[2],
+coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ5",]))[2],
+coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Meadow",]))[2],
+coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Unnamed_Creek",]))[2])
 names(slopeDist) <- c("Crow_Creek", "Diamond_Creek", "HQ3", "HQ5", "Meadow", "Unnamed_Creek")
 
 logLambda_nt_distFig <- ggplot() +
-  geom_ribbon(aes(x = seq(-3.25,1.5,length.out = 60)[41:60], 
-                  ymin = 0, 
-                  ymax = dnorm(x = c(seq(-3.25,1.5,length.out = 60)), mean = mean(slopeDist), sd = sd(slopeDist))[41:60]), colour = "grey80", fill = "grey80") +
+  geom_ribbon(aes(x = seq(-3.25,1.5,length.out = 60)[41:60],  ymin = 0, ymax = dnorm(x = c(seq(-3.25,1.5,length.out = 60)), mean = mean(slopeDist), sd = sd(slopeDist))[41:60]), colour = "grey80", fill = "grey80") +
   geom_vline(aes(xintercept = 0), lty = 2, col = "darkgrey") +
-  geom_line(aes(x = seq(-3.25,1.5,length.out = 60), y = dnorm(x = c(seq(-3.25,1.5,length.out = 60)), mean = mean(slopeDist), sd = sd(slopeDist)))) + 
+  geom_line(aes(x = seq(-17,1.5,length.out = 60), y = dnorm(x = c(seq(-17,1.5,length.out = 60)), mean = mean(slopeDist), sd = sd(slopeDist)))) + 
   geom_rug((aes(x = slopeDist, col = names(slopeDist))), lwd = 1) + 
   xlab(expression(paste("slope of log(", lambda, ") ~ log(N ",italic(t), ")"))) + 
   ylab("Probability") + 
@@ -253,19 +263,19 @@ pnorm(0, mean = mean(slopeDist), sd = sd(slopeDist), lower.tail = FALSE)
 
 ## plot subpop size in year t+1 as a function of subpop size in year t
 ntplus1_nt_figure <- ggplot(data = byYear_DI_lams) +
-  geom_point(aes(x = log(N_all_t), y = log(N_all_tplus1/N_all_t), col = Site)) +
-  geom_smooth(aes(x =  log(N_all_t), y = log(N_all_tplus1/N_all_t), col = Site), se = FALSE, method = "lm", lwd = .75) +
+  geom_point(aes(x = log(N_Site_t), y = (log(N_Site_tplus1)/log(N_Site_t)), col = Site)) +
+  geom_smooth(aes(x =  log(N_Site_t), y = (log(N_Site_tplus1)/log(N_Site_t)), col = Site), se = FALSE, method = "lm", lwd = .75) +
   theme_classic()  +
   scale_color_brewer(type = "qual", palette = "Dark2") +
   xlab(expression(paste("log(N ", italic(t), ")"))) + 
   ylab(expression(paste("log(N ", italic(t+1), ") / log(N ", italic(t), ")")))
 
-slopeDist_2 <- c(coefficients(lm(log(N_all_tplus1/N_all_t) ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Crow_Creek",]))[2],
-               coefficients(lm(log(N_all_tplus1/N_all_t) ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Diamond_Creek",]))[2],
-               coefficients(lm(log(N_all_tplus1/N_all_t) ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ3",]))[2],
-               coefficients(lm(log(N_all_tplus1/N_all_t) ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ5",]))[2],
-               coefficients(lm(log(N_all_tplus1/N_all_t) ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Meadow",]))[2],
-               coefficients(lm(log(N_all_tplus1/N_all_t) ~ log(N_all_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Unnamed_Creek",]))[2])
+slopeDist_2 <- c(coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Crow_Creek",]))[2],
+               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Diamond_Creek",]))[2],
+               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ3",]))[2],
+               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ5",]))[2],
+               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Meadow",]))[2],
+               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Unnamed_Creek",]))[2])
 names(slopeDist_2) <- c("Crow_Creek", "Diamond_Creek", "HQ3", "HQ5", "Meadow", "Unnamed_Creek")
 
 ntplus1_nt_distFig <- ggplot() +
@@ -273,7 +283,7 @@ ntplus1_nt_distFig <- ggplot() +
                   ymin = 0, 
                   ymax = dnorm(x = c(seq(-3,.5,length.out = 50)), mean = mean(slopeDist_2), sd = sd(slopeDist_2))[43:50]), colour = "grey80", fill = "grey80") + 
   geom_vline(aes(xintercept = 0), lty = 2, col = "darkgrey") +
-  geom_line(aes(x = seq(-3,.5,length.out = 50), y = dnorm(x = c(seq(-3,.5,length.out = 50)), mean = mean(slopeDist_2), sd = sd(slopeDist_2)))) + 
+  geom_line(aes(x = seq(-4.5,.5,length.out = 50), y = dnorm(x = c(seq(-4.5,.5,length.out = 50)), mean = mean(slopeDist_2), sd = sd(slopeDist_2)))) + 
   geom_rug(aes(x = slopeDist_2, color = names(slopeDist_2)), lwd = 1) + 
   xlab(expression(paste("slope of log(N ",italic(t+1)," / N ", italic(t) ,") ~ log(N", italic(t), ")"))) + 
   ylab("Probability") + 
