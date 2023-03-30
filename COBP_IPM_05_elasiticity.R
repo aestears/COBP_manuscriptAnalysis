@@ -9,8 +9,8 @@ library(tidyverse)
 library(ipmr)
 
 #### load vital rate models from previous script ####
-load(file = "./analysis_scripts/analysis_scripts/ipm_results.RData")
-source(file = "./analysis_scripts/COBP_IPM_04_ellnerCodeSimpleIPMs.R")
+source("./analysis_scripts/01_VitalRateModels.R")
+load(file = "./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/ipmA_B_results.RData")
 
 # lower limit of size in the ipm
 L = min(dat$log_LL_t, na.rm = TRUE) * .8
@@ -21,8 +21,8 @@ n <- 500
 meshpts <- seq(from = L, to = U, length.out = 500)
 h = meshpts[2] - meshpts[1]
 
-#### DI all dat IPM ####
-## called 'mat_all_DI' 
+#### DI all dat IPM (IPM B)####
+## IPM calculated by hand is called 'mat_all_DI' 
 # calculate lambda
 (lam_allDI <- Re(eigen(mat_all_DI)$values[1])) # 1.91
 
@@ -116,10 +116,10 @@ L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
 U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
 n <-500 # bins
 
-# previous SB vital rates
-germ.rt <-  0.1629526
-viab.rt <- 0.5852778
-surv.seeds <-  0.9 
+# previous SB vital rates (From script 01)
+#germ.rt 
+#viab.rt 
+#surv.seeds
 
 # make a vector that contains the proportions by which the parameter will be changed
 perc_changes <- seq(0,1, by = .05)
@@ -328,9 +328,9 @@ mean_disc_perturbs <- disc_perturbs %>%
 saveRDS(mean_disc_perturbs, file = "./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/discreteParamElasticity.RDS")
 ## get elasticity/sensitivity for other vital rate parameters (model parameters in vital rate models)
 # previous SB vital rates
-germ.rt <-  0.1629526
-viab.rt <- 0.5852778
-surv.seeds <-  0.9 
+# germ.rt 
+# viab.rt 
+# surv.seeds 
 # 'actual' parameters are in the 'paramCont' list
 
 # make a vector that contains the proportions by which the parameter will be changed
@@ -509,6 +509,10 @@ mean_model_perturbs <- model_perturbs %>%
   summarize(param_OGval = mean(param_OGval, na.rm = TRUE), sens_mean = mean(sens, na.rm = TRUE), elas_mean = mean(elas, na.rm = TRUE))
 
 saveRDS(mean_model_perturbs, file = "./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/continuousParamElasticity.RDS")
+
+#### calculating sensitivity of IPM B continuous parameters ####
+
+
 
 #%%%AES%%% double check how sensitivity and elasticity are calculated...
 #### DD all dat IPM ####
@@ -1089,3 +1093,6 @@ image(t(IPM_contrib^.1))
 ## 4. Sensitivity and elasticity (proportional sensitivity) analyses can determine how different parts of the kernel influence population statistics (de Kroon, van Groenendael & Ehrl?en 2000; Caswell 2001). These analyses can illustrate the relative importance of different transitions, showing in a continuous ‘landscape’ which vital rates and which size ranges contribute most to k or other population statistics (Appendix S1,A,B). Sensitivity and elasticity values can be used to estimate selection gradients in evolutionary studies (Caswell 2001) or to compare effects of different management options in conservation planning (Morris&Doak 2002). Methods exist to estimate sensitivity of an array of population characteristics in the context of transient dynamics (Caswell 2007; Haridas & Tuljapurkar 2007) and stochastic dynamics. 
 ## 5. Another strength of IPMs is the ability to explore vital rate parameter sensitivity (Appendix S1,B). Distinct from transition sensitivities (as above), for example, the sensitivity of k to growth regression parameters can be used to investigate the effects of changes in individual growth rate across all stages simultaneously (intercept), or in a manner that favours larger individuals over smaller individuals (slope). 
 ## 6. Many other population statistics are readily calculated from IPM matrices, such as passage times to life-history events (e.g. maturation; Fig. 3c), life expectancy (Fig. 3d), net reproductive rate (R0) or generation length (Appendix S1,A; Caswell 2001; Smallegange&Coulson 2013).
+
+
+#### elasticity of vital rates in IPM B ####
