@@ -123,7 +123,7 @@ for (i in 1:length(unique(dat_all$Site))) {
   # seedbank (first column of your K)
   Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
   # Make the full P kernel
-  Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+  Pkernel <- cbind(as.vector(Pkernel.seedbank),rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
   ## make the F kernel
   Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
   Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
@@ -131,6 +131,7 @@ for (i in 1:length(unique(dat_all$Site))) {
   Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
   
   mat <-Pkernel+Fkernel
+  names(mat[1])
   
   eigenMat <- eigen(mat)
   

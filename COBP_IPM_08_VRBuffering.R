@@ -6,11 +6,31 @@
 
 library(tidyverse)
 
-# load data from script 1
+# load data from script 01
 dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
 
-#### fit vital rate models for 2018-2019, each subpopulation ####
-subPop_first_VRs <- list()
+#### calculate IPMs (for each site and each transition) ####
+## code is also in script "05_IPMs_CC_NN.R"
+IPMs_CC_HH <- readRDS("./intermediate_analysis_Data/site_level_IPMs_eachYear/IPMs_CC_HH.RDS")
+IPMs_II_NN <- readRDS("./intermediate_analysis_Data/site_level_IPMs_eachYear/IPMs_II_NN.RDS")
+
+### IPM CC-HH ###
+### DI IPM for each site--first half of data, discrete ###
+# Define the lower and upper integration limit
+L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
+U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
+
+n <-200 # bins
+
+# These are the parameters for the discrete stages
+outSB <- outSB_all #SB to continuous stage
+staySB <- staySB_all # staying in SB
+goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
+goSB <- goSB_all # seeds go to the seedbank
+surv.seeds <-  0.9 # survival of seeds
+
+## make an empty list to hold the IPM kernels 
+IPMs_CC_HH <- list()
 for (i in 1:length(unique(dat_all$Site))) {
   ## get data for this 'current' site
   dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i] # data for this site
@@ -25,11 +45,14 @@ for (i in 1:length(unique(dat_all$Site))) {
   sizeMod_now <- lm(log_LL_tplus1 ~ log_LL_t , data = dat_now)
   ## Number of seeds produced, according to plant size ($b(z)$)
   seedDat_now <- dat_now[dat_now$flowering==1,]
+  # fit poisson glm (for count data)
   seedMod_now <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_now)
   ## Flowering probability ($p_b(z)$)
   flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat_now, family = binomial)))
   ## Distribution of recruit size ($c_o(z')$)
+  # subset the data
   recD_now <- dat_all[dat_all$seedling == 1 & dat_all$Year == 2019,]
+  # fit the model
   recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
   
   ## put in the parameter list (paramCont)
@@ -51,56 +74,89 @@ for (i in 1:length(unique(dat_all$Site))) {
     goSB   = goSB_all, 
     goCont = goCont_all                  
   )
-  subPop_first_VRs[[i]] <- paramCont
-}
-names(subPop_first_VRs) <- paste0(unique(dat_all$Site))
-
-#### fit vital rate models for 2019-2020, each subpopulation ####
-subPop_second_VRs <- list()
-for (i in 1:length(unique(dat_all$Site))) {
-  ## get data for this 'current' site
-  dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i] # data for this site
-                     & dat_all$Year == 2019# data for this year
-                     ,]
+  # SURVIVAL:
+  S.fun <- function(z) {
+    mu.surv=paramCont$s_int + paramCont$s_slope *z
+    return(1/(1 + exp(-(mu.surv))))
+  }
+  # GROWTH (we assume a constant variance)
+  GR.fun <- function(z,zz){
+    growth.mu = paramCont$g_int + paramCont$g_slope*z
+    return(dnorm(zz, mean = growth.mu, sd = paramCont$g_sd))
+  }
+  ## SEEDLING SIZES (same approach as in growth function)
+  SDS.fun <- function(zz){
+    rec_mu <- paramCont$c_o_mu
+    rec_sd <- paramCont$c_o_sd
+    return(dnorm(zz, mean = rec_mu, sd = rec_sd))
+  }
+  # PROBABILITY OF FLOWERING 
+  FL.fun <- function(z) {
+    mu.fl = paramCont$p_b_int + paramCont$p_b_slope*z +  paramCont$p_b_slope_2 * (z^2)
+    return(1/(1+ exp(-(mu.fl))))
+  }
+  # SEED PRODUCTION
+  SDP.fun <- function(z) {
+    mu.fps=exp(paramCont$b_int + paramCont$b_slope *z)
+    return(mu.fps)
+  }
   
-  ## fit vital rate models
-  ## Survival ($s(z)$)
-  survDat_now <- dat_now[dat_now$flowering==0 | is.na(dat_now$flowering),]
-  survMod_now <- glm(survives_tplus1 ~ log_LL_t , data = survDat_now, family = binomial)
-  ## Growth ($G(z',z)$)
-  sizeMod_now <- lm(log_LL_tplus1 ~ log_LL_t , data = dat_now)
-  ## Number of seeds produced, according to plant size ($b(z)$)
-  seedDat_now <- dat_now[dat_now$flowering==1,]
-  seedMod_now <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_now)
-  ## Flowering probability ($p_b(z)$)
-  flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat_now, family = binomial)))
-  ## Distribution of recruit size ($c_o(z')$)
-  recD_now <- dat_all[dat_all$seedling == 1 & dat_all$Year == 2020,]
-  recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
+  ## fit the IPM
+  K <- array(0,c(n+1,n+1))
+  # Setting up the kernels
+  b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+  meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+  h=(U-L)/n # bin width 
+  # Survival and growth 
+  S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal of the matrix
+  G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
+  # G <- t(outer(meshp,meshp,GR.fun)) # Growth
+  #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+  c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+  # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+  #Probability of flowering
+  Pb = (FL.fun(meshp))
+  #Number of seeds produced according to adult size
+  b_seed = (SDP.fun(meshp))
+  FecALL= Pb * b_seed
+  # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+  S_new <- S * (1-Pb)
+  # Control for eviction:
+  # this is equivalent to redistributing evicted sizes evenly among existing size classes 
+  G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+  # make the continuous part of the P matrix
+  Pkernel.cont <- as.matrix(G %*% S_new)
+  # seedbank (first column of your K)
+  Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+  # Make the full P kernel
+  Pkernel <- cbind(as.vector(Pkernel.seedbank),rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+  ## make the F kernel
+  Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+  Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+  # multiply the cont_to_disc distribution by the binwidth (h)
+  Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
   
-  ## put in the parameter list (paramCont)
-  paramCont <- list(
-    g_int     = coef(sizeMod_now)[1], # growth 
-    g_slope   = coef(sizeMod_now)[2],
-    g_sd      = summary(sizeMod_now)$sigma,
-    s_int     = coef(survMod_now)[1], # survival
-    s_slope   = coef(survMod_now)[2],
-    p_b_int   = coef(flwrMod_now)[1], #probability of flowering
-    p_b_slope = coef(flwrMod_now)[2],
-    p_b_slope_2 = coef(flwrMod_now)[3],
-    b_int   = coef(seedMod_now)[1], #seed production
-    b_slope = coef(seedMod_now)[2],
-    c_o_mu    = coef(recMod_now), #recruit size distribution
-    c_o_sd    = summary(recMod_now)$sigma,
-    outSB  = outSB_all,
-    staySB = staySB_all,
-    goSB   = goSB_all, 
-    goCont = goCont_all                  
-  )
-  subPop_second_VRs[[i]] <- paramCont
+  mat <-Pkernel+Fkernel
+  names(mat[1])
+  
+  eigenMat <- eigen(mat)
+  
+  IPMs_CC_HH[[i]] <- list(KMatrix = mat,
+                          GMatrix = G, 
+                          SMatrix = S_new,
+                          FMatrix = Fkernel.cont,
+                          staySB_vec = staySB, 
+                          leaveSB_vec = as.matrix((outSB*c_o[,1]), nrow = 200, ncol = 1), 
+                          goSB_vec = matrix(c( goSB * (FecALL)), nrow = 1))
 }
-names(subPop_second_VRs) <- paste0(unique(dat_all$Site))
+names(IPMs_CC_HH) <- paste0(unique(dat_all$Site))
+lambdas_IPMs_CC_HH <- sapply(IPMs_CC_HH, FUN = function(x) eigen(x)$values[1])
 
+
+
+#### Calculate corrected standard deviation of Vital Rates #### 
+# calculate the standard deviation of each vital rate 
 #### combine the vital rate params for comparison ####
 temp <- as.data.frame(sapply(subPop_first_VRs, function(x) data.frame(x)))
 names(temp)  <- paste0(names(subPop_second_VRs), "_first")

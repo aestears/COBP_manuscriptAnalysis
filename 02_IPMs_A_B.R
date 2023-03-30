@@ -329,7 +329,7 @@ ipm_B <- init_ipm(sim_gen   = "general",
   ) %>% 
   make_ipm(
     normalize_pop_size = FALSE,
-    iterations = 1000
+    iterations = 500
   )
 
 ipmr::lambda(ipm_B)

@@ -51,12 +51,12 @@ contour(x = meshpts, y = meshpts, t(elas_allDI[2:501,2:501]), add = TRUE)
 
 # make matrices using ipmr data to double-check
 ## calculate the stable size distribution
-w.eigen_test <-  right_ev(contSeedlings_IPM)
+w.eigen_test <-  right_ev(ipm_B)
 w.eigen_test <- c(w.eigen_test$b_w,w.eigen_test$size_w)
 stable.dist_test <- w.eigen_test/sum(w.eigen_test) 
 
 ## calculate the reproductive value distribution
-v.eigen_test <- left_ev(contSeedlings_IPM)
+v.eigen_test <- left_ev(ipm_B)
 v.eigen_test <- c(v.eigen_test$b_v, v.eigen_test$size_v)
 repro.val_test <- v.eigen_test/v.eigen_test[1]
 
@@ -513,8 +513,6 @@ saveRDS(mean_model_perturbs, file = "./intermediate_analysis_Data/allSiteAllYear
 #### calculating sensitivity of IPM B continuous parameters ####
 
 
-
-#%%%AES%%% double check how sensitivity and elasticity are calculated...
 #### DD all dat IPM ####
 ## called 'mat_all_DD' 
 # calculate lambda
