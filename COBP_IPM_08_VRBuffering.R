@@ -292,6 +292,338 @@ names(IPMs_II_NN) <- paste0(unique(dat_all$Site),"_19_20")
 lambdas_IPMs_II_NN <- sapply(IPMs_II_NN, FUN = function(x) eigen(x[1][[1]])$values[1])
 
 
+#### calculate w/ ipmr ####
+### IPM CC-HH ###
+### DI IPM for each site--first half of data, discrete ###
+# Define the lower and upper integration limit
+L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
+U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
+
+n <-200 # bins
+
+# These are the parameters for the discrete stages
+outSB <- outSB_all #SB to continuous stage
+staySB <- staySB_all # staying in SB
+goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
+goSB <- goSB_all # seeds go to the seedbank
+surv.seeds <-  0.9 # survival of seeds
+
+## make an empty list to hold the IPM kernels 
+IPMs_CC_HH_ipmr <- list()
+for (i in 1:length(unique(dat_all$Site))) {
+  ## get data for this 'current' site
+  dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i] # data for this site
+                     & dat_all$Year == 2018# data for this year
+                     ,]
+  
+  ## fit vital rate models
+  ## Survival ($s(z)$)
+  survDat_now <- dat_now[dat_now$flowering==0 | is.na(dat_now$flowering),]
+  survMod_now <- glm(survives_tplus1 ~ log_LL_t , data = survDat_now, family = binomial)
+  ## Growth ($G(z',z)$)
+  sizeMod_now <- lm(log_LL_tplus1 ~ log_LL_t , data = dat_now)
+  ## Number of seeds produced, according to plant size ($b(z)$)
+  seedDat_now <- dat_now[dat_now$flowering==1,]
+  # fit poisson glm (for count data)
+  seedMod_now <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_now)
+  ## Flowering probability ($p_b(z)$)
+  flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat_now, family = binomial)))
+  ## Distribution of recruit size ($c_o(z')$)
+  # subset the data
+  recD_now <- dat_all[dat_all$seedling == 1 & dat_all$Year == 2019,]
+  # fit the model
+  recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
+  
+  ## put in the parameter list (paramCont)
+  param_cont <- list(
+    g_int     = coef(sizeMod_now)[1], # growth 
+    g_slope   = coef(sizeMod_now)[2],
+    g_sd      = summary(sizeMod_now)$sigma,
+    s_int     = coef(survMod_now)[1], # survival
+    s_slope   = coef(survMod_now)[2],
+    p_b_int   = coef(flwrMod_now)[1], #probability of flowering
+    p_b_slope = coef(flwrMod_now)[2],
+    p_b_slope_2 = coef(flwrMod_now)[3],
+    b_int   = coef(seedMod_now)[1], #seed production
+    b_slope = coef(seedMod_now)[2],
+    c_o_mu    = coef(recMod_now), #recruit size distribution
+    c_o_sd    = summary(recMod_now)$sigma,
+    outSB  = outSB_all,
+    staySB = staySB_all,
+    goSB   = goSB_all, 
+    goCont = goCont_all                  
+  )
+  # inital population state
+  init_size_state <- runif(200)
+  
+  ipm_temp <- init_ipm(sim_gen   = "general", 
+                    di_dd     = "di", 
+                    det_stoch = "det") %>% 
+    define_kernel(
+      name          = "P",
+      formula       =(1-p_b.) * s. * g. * d_size,
+      
+      s.            = 1/(1 + exp(-(s_int + s_slope * size_1))),
+      g.            = dnorm(size_2, g_mu., g_sd), 
+      g_mu.         = g_int + g_slope * size_1, 
+      p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+      
+      family        = "CC",
+      data_list     = param_cont,
+      states        = list(c('size')),
+      uses_par_sets = FALSE,
+      evict_cor     = TRUE,
+      evict_fun     = truncated_distributions("norm", "g.")
+    ) %>% 
+    define_kernel(
+      name          = "F", 
+      formula       = goCont. * (p_b. * b. * c_o. * d_size),
+      
+      p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+      b.            = exp(b_int + b_slope * size_1),
+      c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+      goCont.       = goCont,
+      
+      family        = "CC",
+      data_list     = param_cont,
+      states        = list(c('size')),
+      uses_par_sets = FALSE,
+      evict_cor     = TRUE,
+      evict_fun     = truncated_distributions("norm", "c_o.")
+    ) %>% define_kernel(
+      name          = "seedbank_to_continuous", 
+      formula       = outSB. * c_o. ,
+      
+      c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+      outSB.       = outSB,
+      
+      family        = "DC",
+      data_list     = param_cont,
+      states        = list(c('size')),
+      uses_par_sets = FALSE,
+      evict_cor     = TRUE,
+      evict_fun     = truncated_distributions("norm", "c_o.")
+    ) %>% define_kernel(
+      name          = "seedbank_to_seedbank", 
+      formula       = staySB.,
+      
+      staySB.       = staySB,
+      
+      family        = "DD",
+      data_list     = param_cont,
+      states        = list(c('b')),
+      uses_par_sets = FALSE,
+      evict_cor     = FALSE
+    )   %>% define_kernel(
+      name          = "continuous_to_seedbank", 
+      formula       = goSB.  * (p_b. * b. * d_size),
+      
+      p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+      b.            = exp(b_int + b_slope * size_1),
+      goSB.       = goSB,
+      
+      family        = "CD",
+      data_list     = param_cont,
+      states        = list(c('size', 'b')),
+      uses_par_sets = FALSE,
+      evict_cor     = FALSE
+    )  %>%
+    define_impl(
+      make_impl_args_list(
+        kernel_names = c("P", "F", "seedbank_to_continuous", "seedbank_to_seedbank", "continuous_to_seedbank"), 
+        int_rule = rep("midpoint", 5),
+        state_start = c("size", "size", "b", "b", "size"), 
+        state_end = c("size", "size", "size", "b", "b")
+      )
+    ) %>% 
+    define_domains(
+      size = c(
+        min(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # lower bound (L)
+        max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
+        200 # number of mesh points
+      )
+    ) %>% 
+    define_pop_state(
+      n_size = runif(200),
+      n_b = 200, 
+      
+    ) %>% 
+    make_ipm(
+      normalize_pop_size = FALSE,
+      iterations = 200
+    )
+  
+  IPMs_CC_HH_ipmr[[i]] <- ipm_temp
+}
+names(IPMs_CC_HH_ipmr) <- paste0(unique(dat_all$Site),"_18_19")
+lambdas_IPMs_CC_HH_ipmr <- sapply(IPMs_CC_HH_ipmr, FUN = function(x) ipmr::lambda(x))
+
+### IPMs II-NN ###
+### DI IPM for each site--second half of data, discrete ###
+# Define the lower and upper integration limit
+L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
+U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
+
+n <-200 # bins
+
+# These are the parameters for the discrete stages
+outSB <- outSB_all #SB to continuous stage
+staySB <- staySB_all # staying in SB
+goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
+goSB <- goSB_all # seeds go to the seedbank
+surv.seeds <-  0.9 # survival of seeds
+
+## make an empty list to hold the IPM kernels 
+IPMs_II_NN_ipmr <- list()
+for (i in 1:length(unique(dat_all$Site))) {
+  ## get data for this 'current' site
+  dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i] # data for this site
+                     & dat_all$Year == 2019# data for this year
+                     ,]
+  
+  ## fit vital rate models
+  ## Survival ($s(z)$)
+  survDat_now <- dat_now[dat_now$flowering==0 | is.na(dat_now$flowering),]
+  survMod_now <- glm(survives_tplus1 ~ log_LL_t , data = survDat_now, family = binomial)
+  ## Growth ($G(z',z)$)
+  sizeMod_now <- lm(log_LL_tplus1 ~ log_LL_t , data = dat_now)
+  ## Number of seeds produced, according to plant size ($b(z)$)
+  seedDat_now <- dat_now[dat_now$flowering==1,]
+  # fit poisson glm (for count data)
+  seedMod_now <- MASS::glm.nb(Num_seeds ~ log_LL_t , data = seedDat_now)
+  ## Flowering probability ($p_b(z)$)
+  flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat_now, family = binomial)))
+  ## Distribution of recruit size ($c_o(z')$)
+  # subset the data
+  recD_now <- dat_all[dat_all$seedling == 1 & dat_all$Year == 2020,]
+  # fit the model
+  recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
+  
+  ## put in the parameter list (paramCont)
+  param_cont <- list(
+    g_int     = coef(sizeMod_now)[1], # growth 
+    g_slope   = coef(sizeMod_now)[2],
+    g_sd      = summary(sizeMod_now)$sigma,
+    s_int     = coef(survMod_now)[1], # survival
+    s_slope   = coef(survMod_now)[2],
+    p_b_int   = coef(flwrMod_now)[1], #probability of flowering
+    p_b_slope = coef(flwrMod_now)[2],
+    p_b_slope_2 = coef(flwrMod_now)[3],
+    b_int   = coef(seedMod_now)[1], #seed production
+    b_slope = coef(seedMod_now)[2],
+    c_o_mu    = coef(recMod_now), #recruit size distribution
+    c_o_sd    = summary(recMod_now)$sigma,
+    outSB  = outSB_all,
+    staySB = staySB_all,
+    goSB   = goSB_all, 
+    goCont = goCont_all                  
+  )  # inital population state
+  init_size_state <- runif(200)
+  
+  ipm_temp <- init_ipm(sim_gen   = "general", 
+                       di_dd     = "di", 
+                       det_stoch = "det") %>% 
+    define_kernel(
+      name          = "P",
+      formula       =(1-p_b.) * s. * g. * d_size,
+      
+      s.            = 1/(1 + exp(-(s_int + s_slope * size_1))),
+      g.            = dnorm(size_2, g_mu., g_sd), 
+      g_mu.         = g_int + g_slope * size_1, 
+      p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+      
+      family        = "CC",
+      data_list     = param_cont,
+      states        = list(c('size')),
+      uses_par_sets = FALSE,
+      evict_cor     = TRUE,
+      evict_fun     = truncated_distributions("norm", "g.")
+    ) %>% 
+    define_kernel(
+      name          = "F", 
+      formula       = goCont. * (p_b. * b. * c_o. * d_size),
+      
+      p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+      b.            = exp(b_int + b_slope * size_1),
+      c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+      goCont.       = goCont,
+      
+      family        = "CC",
+      data_list     = param_cont,
+      states        = list(c('size')),
+      uses_par_sets = FALSE,
+      evict_cor     = TRUE,
+      evict_fun     = truncated_distributions("norm", "c_o.")
+    ) %>% define_kernel(
+      name          = "seedbank_to_continuous", 
+      formula       = outSB. * c_o. ,
+      
+      c_o.          = dnorm(size_2, mean =c_o_mu, sd = c_o_sd ),
+      outSB.       = outSB,
+      
+      family        = "DC",
+      data_list     = param_cont,
+      states        = list(c('size')),
+      uses_par_sets = FALSE,
+      evict_cor     = TRUE,
+      evict_fun     = truncated_distributions("norm", "c_o.")
+    ) %>% define_kernel(
+      name          = "seedbank_to_seedbank", 
+      formula       = staySB.,
+      
+      staySB.       = staySB,
+      
+      family        = "DD",
+      data_list     = param_cont,
+      states        = list(c('b')),
+      uses_par_sets = FALSE,
+      evict_cor     = FALSE
+    )   %>% define_kernel(
+      name          = "continuous_to_seedbank", 
+      formula       = goSB.  * (p_b. * b. * d_size),
+      
+      p_b.          = 1/(1 + exp(-(p_b_int + p_b_slope * size_1 + p_b_slope_2 * (size_1^2)))),
+      b.            = exp(b_int + b_slope * size_1),
+      goSB.       = goSB,
+      
+      family        = "CD",
+      data_list     = param_cont,
+      states        = list(c('size', 'b')),
+      uses_par_sets = FALSE,
+      evict_cor     = FALSE
+    )  %>%
+    define_impl(
+      make_impl_args_list(
+        kernel_names = c("P", "F", "seedbank_to_continuous", "seedbank_to_seedbank", "continuous_to_seedbank"), 
+        int_rule = rep("midpoint", 5),
+        state_start = c("size", "size", "b", "b", "size"), 
+        state_end = c("size", "size", "size", "b", "b")
+      )
+    ) %>% 
+    define_domains(
+      size = c(
+        min(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # lower bound (L)
+        max(dat_all$log_LL_t, na.rm = TRUE) * 1.2, # upper bound (U)
+        200 # number of mesh points
+      )
+    ) %>% 
+    define_pop_state(
+      n_size = runif(200),
+      n_b = 200, 
+      
+    ) %>% 
+    make_ipm(
+      normalize_pop_size = FALSE,
+      iterations = 200
+    )
+  
+  IPMs_II_NN_ipmr[[i]] <- ipm_temp
+}
+names(IPMs_II_NN_ipmr) <- paste0(unique(dat_all$Site),"_19_20")
+lambdas_IPMs_II_NN_ipmr <- sapply(IPMs_II_NN_ipmr, FUN = function(x) ipmr::lambda(x))
+megaMat_IPMs_II_NN_ipmr <- lapply(IPMs_II_NN_ipmr, FUN = function(x) ipmr::format_mega_kernel(ipm = x, 
+           mega_mat = c(seedbank_to_seedbank, continuous_to_seedbank, seedbank_to_continuous, P + F))$mega_matrix)
+
 #### Calculate corrected standard deviation of Vital Rates #### 
 
 # put all of the IPMs into one big list
@@ -316,7 +648,7 @@ surv <- sapply(allSmat, FUN = colSums)
 surv.mu <- apply(surv, 1, mean)
 # get the standard deviation of survival over all of the IPMs 
 surv.sd <- apply(surv, 1, sd)
-# get the corrected sd
+# get the corrected sd (use a logit transformation, since it is a probability)
 corr.surv.sd <- apply(logit(surv,adjust = 0.001), 1 ,sd) # McDonald et al. (2017) used logit transformation on 0-1 vital rates
 
 ### Fecundity 
@@ -326,9 +658,12 @@ lapply(allFmat, FUN = function(x) sum(x==0))
 # yay! no 0s 
 
 # Corrected standard deviation for fecundity rates (again according to McDonald et al. 2017)
+# mean fecundity
 fec.mu <- apply(simplify2array(allFmat), 1:2, mean) # get a matrix that is an average of all of the different Fmats from each IPM
+# sd of fecundity
 fec.sd <- apply(simplify2array(allFmat), 1:2, sd)
-corr.fec.sd <- apply(log(simplify2array(allFmat)), 1:2, sd) # log transformation is NOT required (are # of new individuals created, not a probability??)
+# corrected sd of fecundity (use a log transformation, since it is NOT a probability)
+corr.fec.sd <- apply(log(simplify2array(allFmat)), 1:2, sd) 
 
 # Mean matrices, necessary further on (for sensitivity calculations)
 MatMean  <- mean(allKmat)
@@ -336,25 +671,130 @@ MatMeanS <- mean(allSmat)
 MatMeanF <- mean(allFmat) 
 MatMeanG <- mean(allGmat)
 
-### Growth. %%% I think this is correct? treat it the same way as fecundity? (i.e. values for the entire matrix, dont' sum across columns like for survival)
+### Growth. %%% I think this is correct? treat it the same way as fecundity? (i.e. values for the entire matrix, don't sum across columns like for survival)
 # mean of growth
 growth.mean <- apply(simplify2array(allGmat), 1:2, mean)
 # sd of growth
 growth.sd <- apply(simplify2array(allGmat), 1:2, sd)
-# corrected sd of growth 
+# corrected sd of growth (use a logit transformation, since it is a probability)
 corr.growth.sd <- apply(logit(simplify2array(allGmat), adjust=0.001), 1:2, sd)
 
 ### staying in the seedbank # values are identical, so don't bothor
 
 ### leaving the seedbank
+# mean of leaving SB
 leaveSB.mean <- apply(simplify2array(allLeaveSB), 1:2, mean)
+# sd of leaving SB
 leaveSB.sd <- apply(simplify2array(allLeaveSB), 1:2, sd)
-corr.leaveSB.sd <- apply(logit(simplify2array(allLeaveSB), adjust=0.001), 1:2, sd) ## i don't think we need this, because the values are # of seeds, not a probability? 
-
+# corrected sd of leaving SB (use a logit transformation, since it is a probability)
+corr.leaveSB.sd <- apply(logit(simplify2array(allLeaveSB), adjust=0.001), 1:2, sd) 
 ### going to the seedbank
+# mean of going to SB
 goSB.mean <- apply(simplify2array(allGoSb), 1:2, mean)
+# sd of going to SB
 goSB.sd <- apply(simplify2array(allGoSb), 1:2, sd)
-corr.goSB.sd <- apply(logit(simplify2array(allGoSb), adjust=0.001), 1:2, sd) ## i don't think we need this, because the values are # of seeds, not a probability? 
+# corrected sd of going to SB (use a log transformation, since it is NOT a probability)
+corr.goSB.sd <- apply(log(simplify2array(allGoSb)), 1:2, sd)
+
+##### 3. SENSITIVITY ###################################################
+
+# Calculation of the corrected sensitivity. The first step is the calculation according to Silvertown and Franco (2004), and then we apply a correction according to McDonald et al. (2017)
+
+S <- sensitivity(MatMean, zero = F) # these are the uncorrected sensitivities, i.e. on the matrix elements, not on the underlying vital rates. It's necessary to calculate them on the underlying vital rates (Silvertown and Franco 2004)
+
+# do by hand to check...
+h <- diff(meshp[1:2])
+eigen_hand <- eigen(MatMean)
+w.z <- Re(eigen_hand$vectors[,1])
+v.z1 <- Re(eigen(t(MatMean))$vectors[,1])
+S_hand <- outer(v.z1, w.z, "*")/sum(v.z1*w.z*h)
+
+S_test <- popbio::eigen.analysis(MatMean)$sensitivities
+#### 3a) Survival
+# sensitivity of population growth rate (i.e. lambda) to changes in survival rates
+sens.surv <- rep(0, length(MatMeanS[,1]))
+for(i in 1:length(MatMean[,1])-1)
+{
+  sens.surv[i] <- S[i+1,i+1]*(1-MatMeanG[i+1,i]) + S[i+1,i]*MatMeanG[i+1,i]
+}
+sens.surv[length(MatMean[,1])] <- S[length(MatMean[,1]),length(MatMean[,1])] 
+
+# VSS on survival (correction suggested by McDonald et al., to account for 0-1 boundaries in vital rates such as survival and growth)
+VSS.surv <- rep(0, length(MatMean[,1]))
+for(i in 1:length(MatMean[,1]))
+{
+  VSS.surv[i] <- sens.surv[i]*surv.mu[i]*(1-surv.mu[i])/lambda(MatMean)
+}
+
+#### 3b) Fecundity
+# For fecundity rates the VSS transformation corresponds to the elasticities
+elast     <- elasticity(MatMean)
+elast.fec <- elast[which(fec.mu != 0)] # keep only the elasticities of fecundity values
+sens.fec= sensitivity(MatMean)
+sens.fec <- sens.fec[which(fec.mu != 0)]
+
+#### 3c) Growth
+# sensitivity of lambda to growth according to Silvertown and Franco 2004
+
+if(Species_name[k] == "Suricata_suricatta")
+{
+  sens.growth <- rep(0,length(MatMean[,1]))
+  
+  for(i in 1:length(MatMean[,1])-1)
+  {
+    sens.growth[i]<- abs(S[i,i]*(-surv.mu[i])+S[i+1,i]*surv.mu[i]) 
+  }
+  sens.growth[3] <- sens.growth[2]
+  sens.growth[2] <- abs(S[1,1]*(-surv.mu[1])+S[3,1]*surv.mu[1]) # insert here growth from stage 1 to stage 3
+}else{
+  sens.growth <- rep(0,length(MatMean[,1])-1)
+  for (i in 1:length(MatMean[,1])-1)
+  {
+    sens.growth[i] <- abs(S[i,i]*(-surv.mu[i])+S[i+1,i]*surv.mu[i]) 
+  }
+  
+}
+# VSS on growth (following McDonald 2017)
+VSS.growth <- rep(0,length(MatMean[,1])-1)
+if(sum(MatMeanG) != (dim(MatMeanG)[1]*dim(MatMeanG)[2]))
+{
+  
+  if(Species_name[k] == "Suricata_suricatta")
+  {
+    VSS.growth    <- rep(0,3)
+    VSS.growth[1] <- sens.growth[1]*growthvector[1]*(1-growthvector[1])/lambda(MatMean)
+    VSS.growth[2] <- sens.growth[2]*growthvector[2]*(1-growthvector[2])/lambda(MatMean)
+    VSS.growth[3] <- sens.growth[3]*growthvector[3]*(1-growthvector[3])/lambda(MatMean)
+  }else{
+    for(i in 1:length(MatMean[,1])-1)
+    {
+      VSS.growth[i] <- sens.growth[i]*growthvector[i]*(1-growthvector[i])/lambda(MatMean)
+    }
+  }
+}
+
+
+
+
+temp=data.frame(mean=surv.mu,sd=surv.sd,sd.corr=corr.surv.sd,vss=VSS.surv,vr="surv",sens=sens.surv)
+
+
+temp=rbind(temp,data.frame(mean=fec.mu[fec.mu>0],sd=fec.sd,sd.corr=corr.fec.sd,vss=elast.fec,vr="fec",sens=sens.fec))
+
+
+
+if(sum(diag(MatMeanU)[-dim(MatMeanU)[1]]) > 0){
+  
+  temp=rbind(temp,data.frame(mean=growth.mean,sd=growth.sd,sd.corr=corr.growth.sd,vss=VSS.growth,vr="gr",sens=sens.growth)) 
+  
+} 
+# calculate lambda (pop.growth rate) and store it
+lambdas[k] <- lambda(MatMean)
+
+temp$species=as.character(Species_name[k])
+mean.var=rbind(mean.var,temp)
+
+
 
 # # calculate the standard deviation of each vital rate 
 # #### combine the vital rate params for comparison ####
