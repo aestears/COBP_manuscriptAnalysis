@@ -624,6 +624,15 @@ lambdas_IPMs_II_NN_ipmr <- sapply(IPMs_II_NN_ipmr, FUN = function(x) ipmr::lambd
 megaMat_IPMs_II_NN_ipmr <- lapply(IPMs_II_NN_ipmr, FUN = function(x) ipmr::format_mega_kernel(ipm = x, 
            mega_mat = c(seedbank_to_seedbank, continuous_to_seedbank, seedbank_to_continuous, P + F))$mega_matrix)
 
+testMat <- megaMat_IPMs_II_NN_ipmr$Crow_Creek_19_20
+S_popBio_ipmr <- sensitivity(testMat)
+S_hand_ipmr <- outer(Re(eigen(t(testMat))$vectors[,1]), Re(eigen(testMat)$vectors)[,1], "*")/sum(Re(eigen(t(testMat))$vectors[,1]) * Re(eigen(testMat)$vectors)[,1] * diff(meshp[1:2]))
+
+ipmr_w <- c(ipmr::right_ev(IPMs_II_NN_ipmr$Crow_Creek_19_20)$b_w, ipmr::right_ev(IPMs_II_NN_ipmr$Crow_Creek_19_20)$size_w)
+ipmr_v <- c(ipmr::left_ev(IPMs_II_NN_ipmr$Crow_Creek_19_20)$b_v, ipmr::left_ev(IPMs_II_NN_ipmr$Crow_Creek_19_20)$size_v)
+
+S_ipmr <- outer(ipmr_v, ipmr_w, "*") / sum(ipmr_v * ipmr_w * diff(meshp[1:2]))
+
 #### Calculate corrected standard deviation of Vital Rates #### 
 
 # put all of the IPMs into one big list
@@ -649,7 +658,7 @@ surv.mu <- apply(surv, 1, mean)
 # get the standard deviation of survival over all of the IPMs 
 surv.sd <- apply(surv, 1, sd)
 # get the corrected sd (use a logit transformation, since it is a probability)
-corr.surv.sd <- apply(logit(surv,adjust = 0.001), 1 ,sd) # McDonald et al. (2017) used logit transformation on 0-1 vital rates
+corr.surv.sd <- apply(car::logit(surv,adjust = 0.001), 1 ,sd) # McDonald et al. (2017) used logit transformation on 0-1 vital rates
 
 ### Fecundity 
 # Same as surv.mu
@@ -664,6 +673,8 @@ fec.mu <- apply(simplify2array(allFmat), 1:2, mean) # get a matrix that is an av
 fec.sd <- apply(simplify2array(allFmat), 1:2, sd)
 # corrected sd of fecundity (use a log transformation, since it is NOT a probability)
 corr.fec.sd <- apply(log(simplify2array(allFmat)), 1:2, sd) 
+which(corr.fec.sd==0) 
+# no 0s! 
 
 # Mean matrices, necessary further on (for sensitivity calculations)
 MatMean  <- mean(allKmat)
@@ -677,9 +688,64 @@ growth.mean <- apply(simplify2array(allGmat), 1:2, mean)
 # sd of growth
 growth.sd <- apply(simplify2array(allGmat), 1:2, sd)
 # corrected sd of growth (use a logit transformation, since it is a probability)
-corr.growth.sd <- apply(logit(simplify2array(allGmat), adjust=0.001), 1:2, sd)
+corr.growth.sd <- apply(car::logit(simplify2array(allGmat), adjust=0.001), 1:2, sd)
 
-### staying in the seedbank # values are identical, so don't bothor
+
+if(sum(diag(MatMeanU)[-dim(MatMeanU)[1]]) == 0)
+{ # it checks the stasis transitions (except the last one), if they are all zero it means that stasis is zero and growth is always 1 (such is the case for age-class studies)
+  MatMeanG <- matrix(1, dim(MatMean), dim(MatMean)) # if it is an age class study it creates a matrix full of 1s
+}else{
+  
+  # if the MPMs are stage-based, it's necessary to extract the growth values 
+  Gmat <- array(0, c(dim(Mat[[1]]$matA)[1],dim(Mat[[1]]$matA)[1],dim(Umat)[3])) # empty array to store the growth matrices 
+  for(j in 1:dim(Umat)[3])
+  {
+    for(i in 1:length(Mat[[1]]$matA[1,]))
+    {
+      Gmat[,i,j] <- Umat[,i,j]/surv[i,j]
+    }
+  }
+  
+  if(Species_name[k] == "Suricata_suricatta") # the meerkat populations must be considered separately because there is also growth directly from 1st to 3rd stage in the same year
+  {
+    growth <- matrix(0, length(Mat[[1]]$matA[1,]),length(Mat))
+    for(i in 1:length(Mat))
+    {
+      growth[,i] <- Gmat[,,i][lower.tri(Gmat[,,i], diag=F)] 
+    } 
+    # get from the growth matrix only the values we really need
+  }else{
+    growth <- matrix(0, length(Mat[[1]]$matA[1,])-1,dim(Umat)[3])
+    for(i in 1:dim(Umat)[3])
+    {
+      growth[,i] <- Gmat[,,i][lower.tri(Gmat[,,i], diag=F)& Gmat[,,i]>0]
+    } 
+  }
+  
+  corr.growth.sd <- apply(logit(growth, adjust=0.001), c(1), sd) # Corrected standard deviation of growth rates (McDonald et al. 2017)
+  growth.sd <- apply(growth, c(1), sd) # Corrected standard deviation of growth rates (McDonald et al. 2017)
+  growth.mean <- apply(growth, c(1), mean)
+  # get mean matrix of growth
+  MatMeanG <- apply(Gmat, c(1,2), mean)
+  
+  growthvector <- rep(0, length(MatMeanG[1,]))
+  if(Species_name[k] == "Suricata_suricatta")
+  {
+    growthvector[1] <- MatMeanG[2,1]
+    growthvector[2] <- MatMeanG[3,1]
+    growthvector[3] <- MatMeanG[3,2]
+  }else{
+    for (i in 1:(length(MatMeanG[1,])-1))
+    {
+      growthvector[i] <- MatMeanG[i+1,i] # a vector with only the values of the mean growth matrix that we need
+    }
+  }
+}
+
+
+
+# MatMeanG and growthvector will be needed later, for the sensitivity calculations
+### staying in the seedbank # values are identical, so don't bother
 
 ### leaving the seedbank
 # mean of leaving SB
