@@ -13,7 +13,7 @@ source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
 L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
 U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
 
-n <-200 # bins
+n <-500 # bins
 
 # These are the parameters for the discrete stages
 outSB <- outSB_all #SB to continuous stage
@@ -68,28 +68,28 @@ for (i in 1:length(unique(dat_all$Site))) {
     goCont = goCont_all                  
   )
   # SURVIVAL:
-  S.fun <- function(z) {
+  S.fun <- function(z, paramCont) {
     mu.surv=paramCont$s_int + paramCont$s_slope *z
     return(1/(1 + exp(-(mu.surv))))
   }
   # GROWTH (we assume a constant variance)
-  GR.fun <- function(z,zz){
+  GR.fun <- function(z,zz, paramCont){
     growth.mu = paramCont$g_int + paramCont$g_slope*z
     return(dnorm(zz, mean = growth.mu, sd = paramCont$g_sd))
   }
   ## SEEDLING SIZES (same approach as in growth function)
-  SDS.fun <- function(zz){
+  SDS.fun <- function(zz, paramCont){
     rec_mu <- paramCont$c_o_mu
     rec_sd <- paramCont$c_o_sd
     return(dnorm(zz, mean = rec_mu, sd = rec_sd))
   }
   # PROBABILITY OF FLOWERING 
-  FL.fun <- function(z) {
+  FL.fun <- function(z, paramCont) {
     mu.fl = paramCont$p_b_int + paramCont$p_b_slope*z +  paramCont$p_b_slope_2 * (z^2)
     return(1/(1+ exp(-(mu.fl))))
   }
   # SEED PRODUCTION
-  SDP.fun <- function(z) {
+  SDP.fun <- function(z, paramCont) {
     mu.fps=exp(paramCont$b_int + paramCont$b_slope *z)
     return(mu.fps)
   }
@@ -101,16 +101,16 @@ for (i in 1:length(unique(dat_all$Site))) {
   meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
   h=(U-L)/n # bin width 
   # Survival and growth 
-  S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal of the matrix
-  G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
+  S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+  G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
   # G <- t(outer(meshp,meshp,GR.fun)) # Growth
   #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
-  c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+  c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
   # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
   #Probability of flowering
-  Pb = (FL.fun(meshp))
+  Pb = (FL.fun(meshp, paramCont))
   #Number of seeds produced according to adult size
-  b_seed = (SDP.fun(meshp))
+  b_seed = (SDP.fun(meshp, paramCont))
   FecALL= Pb * b_seed
   # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
   S_new <- S * (1-Pb)
@@ -131,14 +131,20 @@ for (i in 1:length(unique(dat_all$Site))) {
   Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
   
   mat <-Pkernel+Fkernel
-  names(mat[1])
   
   eigenMat <- eigen(mat)
   
-  IPMs_CC_HH[[i]] <- mat
+  IPMs_CC_HH[[i]] <- list(KMatrix = mat,
+                          GMatrix = G, 
+                          SMatrix = S_new,
+                          FMatrix = Fkernel.cont,
+                          staySB_vec = staySB, 
+                          leaveSB_vec = as.matrix((outSB*c_o[,1]), nrow = 500, ncol = 1), 
+                          goSB_vec = matrix(c( goSB * (FecALL)), nrow = 1), 
+                          params = paramCont)
 }
-names(IPMs_CC_HH) <- paste0(unique(dat_all$Site))
-lambdas_IPMs_CC_HH <- sapply(IPMs_CC_HH, FUN = function(x) eigen(x)$values[1])
+names(IPMs_CC_HH) <- paste0(unique(dat_all$Site), "_18_19")
+lambdas_IPMs_CC_HH <- sapply(IPMs_CC_HH, FUN = function(x) eigen(x[1][[1]])$values[1])
 
 ## estimate 95% Bootstrap CIs 
 IPMs_CC_HH_bootCI_lambdas <- list()
@@ -289,7 +295,7 @@ names(means) <- unique(dat_all$Site)
 L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
 U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
 
-n <-200 # bins
+n <-500 # bins
 
 # These are the parameters for the discrete stages
 outSB <- outSB_all #SB to continuous stage
@@ -344,28 +350,28 @@ for (i in 1:length(unique(dat_all$Site))) {
     goCont = goCont_all                  
   )
   # SURVIVAL:
-  S.fun <- function(z) {
+  S.fun <- function(z, paramCont) {
     mu.surv=paramCont$s_int + paramCont$s_slope *z
     return(1/(1 + exp(-(mu.surv))))
   }
   # GROWTH (we assume a constant variance)
-  GR.fun <- function(z,zz){
+  GR.fun <- function(z,zz, paramCont){
     growth.mu = paramCont$g_int + paramCont$g_slope*z
     return(dnorm(zz, mean = growth.mu, sd = paramCont$g_sd))
   }
   ## SEEDLING SIZES (same approach as in growth function)
-  SDS.fun <- function(zz){
+  SDS.fun <- function(zz, paramCont){
     rec_mu <- paramCont$c_o_mu
     rec_sd <- paramCont$c_o_sd
     return(dnorm(zz, mean = rec_mu, sd = rec_sd))
   }
   # PROBABILITY OF FLOWERING 
-  FL.fun <- function(z) {
+  FL.fun <- function(z, paramCont) {
     mu.fl = paramCont$p_b_int + paramCont$p_b_slope*z +  paramCont$p_b_slope_2 * (z^2)
     return(1/(1+ exp(-(mu.fl))))
   }
   # SEED PRODUCTION
-  SDP.fun <- function(z) {
+  SDP.fun <- function(z, paramCont) {
     mu.fps=exp(paramCont$b_int + paramCont$b_slope *z)
     return(mu.fps)
   }
@@ -377,16 +383,16 @@ for (i in 1:length(unique(dat_all$Site))) {
   meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
   h=(U-L)/n # bin width 
   # Survival and growth 
-  S <- diag(S.fun(meshp)) # Survival # put survival probabilities in the diagonal of the matrix
-  G <- h * t(outer(meshp,meshp,GR.fun)) # Growth
+  S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+  G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
   # G <- t(outer(meshp,meshp,GR.fun)) # Growth
   #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
-  c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
+  c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
   # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
   #Probability of flowering
-  Pb = (FL.fun(meshp))
+  Pb = (FL.fun(meshp, paramCont))
   #Number of seeds produced according to adult size
-  b_seed = (SDP.fun(meshp))
+  b_seed = (SDP.fun(meshp, paramCont))
   FecALL= Pb * b_seed
   # update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
   S_new <- S * (1-Pb)
@@ -410,10 +416,17 @@ for (i in 1:length(unique(dat_all$Site))) {
   
   eigenMat <- eigen(mat)
   
-  IPMs_II_NN[[i]] <- mat
+  IPMs_II_NN[[i]] <- list(KMatrix = mat,
+                          GMatrix = G, 
+                          SMatrix = S_new,
+                          FMatrix = Fkernel.cont,
+                          staySB_vec = staySB, 
+                          leaveSB_vec = as.matrix((outSB*c_o[,1]), nrow = 500, ncol = 1), 
+                          goSB_vec = matrix(c( goSB * (FecALL)), nrow = 1),
+                          params = paramCont)
 }
-names(IPMs_II_NN) <- paste0(unique(dat_all$Site))
-lambdas_IPMs_II_NN <- sapply(IPMs_II_NN, FUN = function(x) eigen(x)$values[1])
+names(IPMs_II_NN) <- paste0(unique(dat_all$Site), "_19_20")
+lambdas_IPMs_II_NN <- sapply(IPMs_II_NN, FUN = function(x) eigen(x[1][[1]])$values[1])
 
 ## estimate 95% Bootstrap CIs 
 IPMs_II_NN_bootCI_lambdas <- list()

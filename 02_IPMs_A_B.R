@@ -6,6 +6,7 @@
 
 #### Load packages ####
 library(ipmr)
+library(tidyverse)
 
 #### load vital rate models from previous script ####
 source("./analysis_scripts/01_VitalRateModels.R")
@@ -28,14 +29,14 @@ n <- 500
 # calculate the number of seeds produced by each fruiting adult
 ipm_A_seeds <- dat_all %>% 
   group_by(Plot_ID, Year) %>% 
-  summarize("N_seeds_t" = sum(Num_seeds, na.rm = TRUE)) %>% 
-  rename(Year_t = Year) %>% 
+  dplyr::summarize("N_seeds_t" = sum(Num_seeds, na.rm = TRUE)) %>% 
+  dplyr::rename(Year_t = Year) %>% 
   mutate(Year_t = as.numeric(as.character(Year_t)))
 # calculate the number of seedlings recruited in each year
 ipm_A_recruits <- dat_all %>% 
   group_by(Plot_ID, Year) %>% 
-  summarize("N_recruits_t" = length(seedling)) %>% 
-  rename(Year_t = Year) %>% 
+  dplyr::summarize("N_recruits_t" = length(seedling)) %>% 
+  dplyr::rename(Year_t = Year) %>% 
   mutate(Year_tplus1 = as.numeric(as.character(Year_t)) - 1)
 
 #combine # seeds in previous year w/ number of seedlings
@@ -44,7 +45,7 @@ ipm_A_estabs <- ipm_A_seeds %>%
             by = c("Year_t" = "Year_tplus1",
                    "Plot_ID" = "Plot_ID")) %>% 
   dplyr::select(- Year_t.y) %>% 
-  rename("N_recruits_tplus1" = "N_recruits_t") %>% 
+  dplyr::rename("N_recruits_tplus1" = "N_recruits_t") %>% 
   mutate("p_estab" = N_recruits_tplus1/N_seeds_t)
   
 ipm_A_estabs[ipm_A_estabs$p_estab == Inf & 
@@ -130,7 +131,7 @@ ipm_A <- init_ipm(sim_gen   = "simple",
     iterations = 1000
     )
 
-lambda(ipm_A)
+ipmr::lambda(ipm_A)
 
 ## estimate CIs using bootstrap resampling
 ## save the proto-ipm 
@@ -190,7 +191,7 @@ for(i in 1:1000) {
              normalize_pop_size = FALSE,
              iterations = 100)
   
-  ipm_A_CI_lambdas[i] <- lambda(boot_ipm)
+  ipm_A_CI_lambdas[i] <- ipmr::lambda(boot_ipm)
   
   ipm_A_CI_params[[i]] <- data.list_now
 }
