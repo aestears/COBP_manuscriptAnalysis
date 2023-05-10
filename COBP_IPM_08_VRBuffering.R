@@ -388,7 +388,7 @@ surv.sd <- apply(surv, 1, sd)
 # get the corrected sd (use a logit transformation, since it is a probability)
 corr.surv.sd <- apply(car::logit(surv,adjust = 0.001), 1 ,sd) # McDonald et al. (2017) used logit transformation on 0-1 vital rates
 
-### Probability of Flowering
+### Probability of Flowering (Pb(z))
 # use the flowering function w/ parameters for each IPM to calculate the P(flowering) vector for each IPM 
 # PROBABILITY OF FLOWERING 
 FL.fun <- function(z, paramCont) {
@@ -413,8 +413,54 @@ for (i in 1:length(flowering.cont)) {
   flowering[[i]] <- rbind(flowering.disc[[i]], cbind(rep(0, length.out = 500), flowering.cont[[i]]))
 }
 
-# are there any values of 0 in the F matrices? 
-lapply(flowering, FUN = function(x) sum(x==0))
+# don't actually have to do this, since this is a probability, which we can do a logit-transformation on
+# # are there any values of 0 in the F matrices? 
+# lapply(flowering, FUN = function(x) sum(x==0))
+# # Since the correction that we must apply to fecundities is the
+# # log-transformation, we encounter problems when the the vital rate has a value
+# # of 0. The following if-else loops are needed to deal with fecundity matrices
+# # with "0" entries where they should have a positive value (0s are a problem
+# # because log transformation can't be done on the value "0"). Therefore, we add
+# # a small value (0.01) to the fecundity value which is 0, over all the years of
+# # the study. This way, we keep a biological meaning, and we stay consistent.
+# flowering <- lapply(flowering, FUN = function(x)
+#   replace(x, list = which(x==0, arr.ind = TRUE), values = .0001)
+#   )
+# Corrected standard deviation for flowering probability (again according to McDonald et al. 2017)
+# mean flowering probability
+flowering.mu <- apply(simplify2array(flowering), 1:2, mean) # get a matrix that is an average of all of the different Fmats from each IPM
+# sd of fecundity
+flowering.sd <- apply(simplify2array(flowering), 1:2, sd)
+# get the corrected sd (use a logit transformation, since it is a probability)
+corr.flowering.sd <- apply(car::logit(simplify2array(flowering),adjust = 0.001), 1:2 ,sd) # McDonald et al. (2017) used logit transformation on 0-1 vital rates
+
+### Seed production (b(z))
+# use the flowering function w/ parameters for each IPM to calculate the seed production vector for each IPM 
+# SEED PRODUCTION
+SDP.fun <- function(z, paramCont) {
+  mu.fps=exp(paramCont$b_int + paramCont$b_slope *z)
+  return(mu.fps)
+}
+
+seedProd <- lapply(allIPMs, FUN = function(x) 
+  SDP.fun(z = meshp, paramCont = x$params)
+)
+# make into a full matrix
+
+# continuous part
+seedProd.cont <- lapply(seedProd, FUN = function(x)
+  as.matrix(diag(x)))
+# add discrete part (contribution of flowering probability to the seedbank)
+seedProd.disc <- lapply(seedProd, FUN = function(x)
+  matrix(c(0, x), nrow = 1))
+
+# combine into one matrix
+for (i in 1:length(seedProd.cont)) {
+  seedProd[[i]] <- rbind(seedProd.disc[[i]], cbind(rep(0, length.out = 500), seedProd.cont[[i]]))
+}
+
+# are there any values of 0 in the seed production matrices? 
+lapply(seedProd, FUN = function(x) sum(x==0))
 # Since the correction that we must apply to fecundities is the
 # log-transformation, we encounter problems when the the vital rate has a value
 # of 0. The following if-else loops are needed to deal with fecundity matrices
@@ -422,9 +468,16 @@ lapply(flowering, FUN = function(x) sum(x==0))
 # because log transformation can't be done on the value "0"). Therefore, we add
 # a small value (0.01) to the fecundity value which is 0, over all the years of
 # the study. This way, we keep a biological meaning, and we stay consistent.
-flowering <- lapply(flowering, FUN = function(x)
-  x[which(x==0, arr.ind = TRUE)] <- 0.0001
-  )
+seedProd <- lapply(seedProd, FUN = function(x)
+  replace(x, list = which(x==0, arr.ind = TRUE), values = .0001)
+)
+# Corrected standard deviation for flowering probability (again according to McDonald et al. 2017)
+# mean seedProd probability
+seedProd.mu <- apply(simplify2array(seedProd), 1:2, mean) # get a matrix that is an average of all of the different Fmats from each IPM
+# sd of fecundity
+seedProd.sd <- apply(simplify2array(seedProd), 1:2, sd)
+# get the corrected sd (use a logit transformation, since it is a probability)
+corr.seedProd.sd <- apply(log(simplify2array(seedProd)), 1:2 ,sd) # McDonald et al. (2017) used logit transformation on 0-1 vital rates
 
 
 ### Fecundity 
