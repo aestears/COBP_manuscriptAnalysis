@@ -479,29 +479,6 @@ seedProd.sd <- apply(simplify2array(seedProd), 1:2, sd)
 # get the corrected sd (use a logit transformation, since it is a probability)
 corr.seedProd.sd <- apply(log(simplify2array(seedProd)), 1:2 ,sd) # McDonald et al. (2017) used logit transformation on 0-1 vital rates
 
-
-### Fecundity 
-# Same as surv.mu
-# are there any values of 0 in the F matrices? 
-lapply(allFmat, FUN = function(x) sum(x==0))
-# yay! no 0s 
-
-# Corrected standard deviation for fecundity rates (again according to McDonald et al. 2017)
-# mean fecundity
-fec.mu <- apply(simplify2array(allFmat), 1:2, mean) # get a matrix that is an average of all of the different Fmats from each IPM
-# sd of fecundity
-fec.sd <- apply(simplify2array(allFmat), 1:2, sd)
-# corrected sd of fecundity (use a log transformation, since it is NOT a probability)
-corr.fec.sd <- apply(log(simplify2array(allFmat)), 1:2, sd) 
-which(corr.fec.sd==0) 
-# no 0s! 
-
-# Mean matrices, necessary further on (for sensitivity calculations)
-MatMean  <- mean(allKmat)
-MatMeanS <- mean(allSmat)
-MatMeanF <- mean(allFmat) 
-MatMeanG <- mean(allGmat)
-
 ### Growth. %%% I think this is correct? treat it the same way as fecundity? (i.e. values for the entire matrix, don't sum across columns like for survival)
 # mean of growth
 growth.mean <- apply(simplify2array(allGmat), 1:2, mean)
