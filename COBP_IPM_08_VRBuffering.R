@@ -388,6 +388,45 @@ surv.sd <- apply(surv, 1, sd)
 # get the corrected sd (use a logit transformation, since it is a probability)
 corr.surv.sd <- apply(car::logit(surv,adjust = 0.001), 1 ,sd) # McDonald et al. (2017) used logit transformation on 0-1 vital rates
 
+### Probability of Flowering
+# use the flowering function w/ parameters for each IPM to calculate the P(flowering) vector for each IPM 
+# PROBABILITY OF FLOWERING 
+FL.fun <- function(z, paramCont) {
+  mu.fl = paramCont$p_b_int + paramCont$p_b_slope*z +  paramCont$p_b_slope_2 * (z^2)
+  return(1/(1+ exp(-(mu.fl))))
+}
+
+flowering <- lapply(allIPMs, FUN = function(x) 
+  FL.fun(z = meshp, paramCont = x$params)
+)
+# make into a full matrix
+
+# continuous part
+flowering.cont <- lapply(flowering, FUN = function(x)
+  as.matrix(diag(x)))
+# add discrete part (contribution of flowering probability to the seedbank)
+flowering.disc <- lapply(flowering, FUN = function(x)
+  matrix(c(0, x), nrow = 1))
+
+# combine into one matrix
+for (i in 1:length(flowering.cont)) {
+  flowering[[i]] <- rbind(flowering.disc[[i]], cbind(rep(0, length.out = 500), flowering.cont[[i]]))
+}
+
+# are there any values of 0 in the F matrices? 
+lapply(flowering, FUN = function(x) sum(x==0))
+# Since the correction that we must apply to fecundities is the
+# log-transformation, we encounter problems when the the vital rate has a value
+# of 0. The following if-else loops are needed to deal with fecundity matrices
+# with "0" entries where they should have a positive value (0s are a problem
+# because log transformation can't be done on the value "0"). Therefore, we add
+# a small value (0.01) to the fecundity value which is 0, over all the years of
+# the study. This way, we keep a biological meaning, and we stay consistent.
+flowering <- lapply(flowering, FUN = function(x)
+  x[which(x==0, arr.ind = TRUE)] <- 0.0001
+  )
+
+
 ### Fecundity 
 # Same as surv.mu
 # are there any values of 0 in the F matrices? 

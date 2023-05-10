@@ -409,7 +409,6 @@ for (i in 1:length(unique(dat_all$Site))) {
   ## make the F kernel
   Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
   Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
-  # multiply the cont_to_disc distribution by the binwidth (h)
   Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
   
   mat <-Pkernel+Fkernel
