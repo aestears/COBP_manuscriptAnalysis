@@ -445,8 +445,8 @@ SDP.fun <- function(z, paramCont) {
 seedProd <- lapply(allIPMs, FUN = function(x) 
   SDP.fun(z = meshp, paramCont = x$params)
 )
-# make into a full matrix
 
+# make into a full matrix
 # continuous part
 seedProd.cont <- lapply(seedProd, FUN = function(x)
   as.matrix(diag(x)))
@@ -480,10 +480,19 @@ seedProd.sd <- apply(simplify2array(seedProd), 1:2, sd)
 corr.seedProd.sd <- apply(log(simplify2array(seedProd)), 1:2 ,sd) # McDonald et al. (2017) used logit transformation on 0-1 vital rates
 
 ### Growth. %%% I think this is correct? treat it the same way as fecundity? (i.e. values for the entire matrix, don't sum across columns like for survival)
+# use the flowering function w/ parameters for each IPM to calculate the seed production vector for each IPM 
+# GROWTH (we assume a constant variance)
+GR.fun <- function(z,zz, paramCont){
+  growth.mu = paramCont$g_int + paramCont$g_slope*z
+  return(dnorm(zz, mean = growth.mu, sd = paramCont$g_sd))
+}
+growth <- lapply(allIPMs, FUN = function(x) 
+  h * t(outer(meshp,meshp,GR.fun, paramCont = x$params)) # Growth
+)
 # mean of growth
-growth.mean <- apply(simplify2array(allGmat), 1:2, mean)
+growth.mean <- apply(simplify2array(growth), 1:2, mean)
 # sd of growth
-growth.sd <- apply(simplify2array(allGmat), 1:2, sd)
+growth.sd <- apply(simplify2array(growth), 1:2, sd)
 # corrected sd of growth (use a logit transformation, since it is a probability)
 corr.growth.sd <- apply(car::logit(simplify2array(allGmat), adjust=0.001), 1:2, sd)
 
