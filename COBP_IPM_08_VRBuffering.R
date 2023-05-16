@@ -496,6 +496,7 @@ growth.sd <- apply(simplify2array(growth), 1:2, sd)
 # corrected sd of growth (use a logit transformation, since it is a probability)
 corr.growth.sd <- apply(car::logit(simplify2array(allGmat), adjust=0.001), 1:2, sd)
 
+
 # make the growth vector
 growthvector <- rep(0, length(MatMeanG[1,]))
 
@@ -504,23 +505,11 @@ for (i in 1:(length(MatMeanG[1,])-1)) {
     }
   
 # MatMeanG and growthvector will be needed later, for the sensitivity calculations
-### staying in the seedbank # values are identical, so don't bother
 
-### leaving the seedbank
-# mean of leaving SB
-leaveSB.mean <- apply(simplify2array(allLeaveSB), 1:2, mean)
-# sd of leaving SB
-leaveSB.sd <- apply(simplify2array(allLeaveSB), 1:2, sd)
-# corrected sd of leaving SB (use a logit transformation, since it is a probability)
-corr.leaveSB.sd <- apply(car::logit(simplify2array(allLeaveSB), adjust=0.001), 1:2, sd) 
+### don't have mean and sd values for seedbank parameters and seedling size
+### distribution, b/c those values were simulated and at the population level (so no real variation)
 
-### going to the seedbank
-# mean of going to SB
-goSB.mean <- apply(simplify2array(allGoSb), 1:2, mean)
-# sd of going to SB
-goSB.sd <- apply(simplify2array(allGoSb), 1:2, sd)
-# corrected sd of going to SB (use a log transformation, since it is NOT a probability)
-corr.goSB.sd <- apply(log(simplify2array(allGoSb)), 1:2, sd)
+
 
 ##### 3. SENSITIVITY ###################################################
 
