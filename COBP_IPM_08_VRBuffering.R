@@ -623,8 +623,35 @@ surv.sd <- c(0, surv.sd)
 
 VSS.surv <- s.sens.z * ((surv.mu*(1-surv.mu))/lambda)
 
+#### Flowering probability
+# Ellner book code
+# function: $\frac{\delta\lambda}{\delta s(z_0)} = \frac{\int v(z')(1-Pb(z_o))G(z',z_0)w(z_0)dz'}{\int v(z)w(z)dz}$, where $v(z)$ is the reproductive value distribution and $w(z_0)$ is the stable size distribution
+dK_by_ds_z1z <- outer (meshp, meshp,
+                       function (z1, z, paramCont) {
+                         GR.fun(z, z1, paramCont) * (1 - FL.fun(z, paramCont))
+                       }, paramCont
+)
+## %%% then, add a row and column of zeros to represent the seedbank?? otherwise the sensitivity matrix is one row and one column larger?
+dK_by_ds_z1z <- cbind(0,rbind(0,dK_by_ds_z1z))
+# "then, multiply this element-wise by the sensitivity function from earlier and
+# sum over the rows to do the integration, remembering to multiply by the
+# meshwidth"
+s.sens.z <- apply(S * dK_by_ds_z1z, 2, sum) * h
+
+
+#code from Maria:  sensitivity of population growth rate (i.e. lambda) to changes in survival rates
+# VSS on survival (correction suggested by McDonald et al., to account for 0-1 boundaries in vital rates such as survival and growth)
+VSS.surv <- rep(0, length(mat_all_DI[,1]))
+
+# θ*(1-θ)/λ * (dλ/dθ)
+# add a '0' to the beginning of the surv.mu and surv.sd vectors (for the seedbank)
+surv.mu <- c(0,surv.mu)
+surv.sd <- c(0, surv.sd)
+
+VSS.surv <- s.sens.z * ((surv.mu*(1-surv.mu))/lambda)
+
 #### 3b) Fecundity
-# For fecundity rates the VSS transformation corresponds to the elasticities
+# For fecundity rates the VSS transformation corresponds to the elasticities ( because they are any value 0 or above)
 elast     <- elasticity(MatMean)
 elast.fec <- elast[which(fec.mu != 0)] # keep only the elasticities of fecundity values
 sens.fec= sensitivity(MatMean)
@@ -848,8 +875,8 @@ d_size       <- mesh_info$d_size
  elas_s <- (s * left_mult(G* (1-Pb), v_size) * w_size) / (lambda * sum(v_size * w_size * d_size))
  
  plot(sens_s, type = 'l')
- lines(1:200, elas_s, lty = 2)
- 
+ lines(1:500, elas_s, lty = 2)
+ lines(VSS.surv*500)
  ### check with a brute force method
  ### Manually compute an intercept sensitivity
  
