@@ -256,7 +256,6 @@ flowering <- lapply(allIPMs,
 # at this point, 'flowering' is a list where each list element is for a subpop/year, and contains a vector of flowering probabilities
 # we need to make this into a full matrix
 # first, make the continuous part (put the flowering probability vector on the diagonal)
-
 flowering.cont <- lapply(flowering, 
                          FUN = function(x)
                            as.matrix(diag(x))
@@ -269,10 +268,11 @@ flowering.disc <- lapply(flowering,
                          )
 
 # combine into one matrix
-
-for (i in 1:length(flowering.cont)) { flowering[[i]] <-
-rbind(flowering.disc[[i]], cbind(rep(0, length.out = 500),
-flowering.cont[[i]])) }
+for (i in 1:length(flowering.cont)) { 
+  flowering[[i]] <-
+    rbind(flowering.disc[[i]], cbind(rep(0, length.out = 500),
+                                     flowering.cont[[i]])) 
+  }
 
 # Now, calculate the mean flowering probability
 # get a matrix that is an average of all of the different Fmats from each IPM 
@@ -536,7 +536,7 @@ lines(VSS.surv, lty = 2)
 Based on code and details from the Ellner, Childs and Rees book
 ** I'm really not sure about this one, because it includes the seedbank, and also parameters that are discrete, so don't need to be integrated??
 
-Function: $$\frac{\delta\lambda}{\delta P_b(z_0)} = \frac{\int v(z')[goCont(b(z)c_o(z')) + goSB(b(z))]w(z)dz'}{\int v(z)w(z)dz}$$
+Function: $$\frac{\delta\lambda}{\delta P_b(z_0)} = \frac{\int v(z')[goCont(b(z_o)c_o(z_o')) + goSB(b(z_o))]w(z)dz'}{\int v(z)w(z)dz}$$
 , where $v(z)$ is the reproductive value distribution and $w(z)$ is the stable size distribution
 
 Calculate the un-corrected sensitivity of the matrix to changes in the flowering prob. function
@@ -550,47 +550,150 @@ dK_by_dPb_z1z_part1 <- outer (meshp, meshp,
   paramCont 
   )
 
+## then, add a row and column of zeros to represent the seedbank %%% not sure if
+# I need to do this, but I think so, otherwise the sensitivity matrix is one
+# row and one column larger?
+dK_by_dPb_z1z_part1 <- cbind(0,rbind(0,dK_by_dPb_z1z_part1))
+
 # multiply by the sensitivity and sum across rows to do the integration, then multiply by the discrete parameter, goCont
-Pb.sens_part1 <- goCont * apply(S[2:501,2:501] *  dK_by_dPb_z1z_part1, 2, sum) * h
+Pb.sens_part1 <- goCont * apply(S *  dK_by_dPb_z1z_part1, 2, sum) * h
 
 # then, do the calculation for the sensitivity of the seedbank state to flowering probability
-dK_by_dPb_z1z_part2 <- outer (meshp, meshp, 
-                              function(z1, z, paramCont) {
-                                SDP.fun(z, paramCont) },
+dK_by_dPb_z1z_part2 <- outer(meshp, meshp, 
+                              function(z1, z, paramCont) {SDP.fun(z, paramCont) },
                               paramCont
                               )
-# multiply by the sensitivity and sum across rows to do the integration, then multiply by the discrete parameter, goCont
-Pb.sens_part2 <- goCont * apply(dK_by_dPb_z1z_part1, 2, sum) * h
-
 
 ## then, add a row and column of zeros to represent the seedbank %%% not sure if
 # I need to do this, but I think so, otherwise the sensitivity matrix is one
 # row and one column larger?
-dK_by_ds_z1z <- cbind(0,rbind(0,dK_by_ds_z1z)) 
-# "then, multiply this element-wise by the sensitivity function from earlier and 
-# sum over the rows to do the integration, remembering to multiply by the meshpt width
-s.sens.z <- apply(S * dK_by_ds_z1z, 2, sum) * h
+dK_by_dPb_z1z_part2 <- cbind(0,rbind(dK_by_dPb_z1z_part2[1,],dK_by_dPb_z1z_part2))
+
+
+# multiply by the sensitivity and sum across rows to do the integration, then multiply by the discrete parameter, goCont
+Pb.sens_part2 <- goSB* apply(S * dK_by_dPb_z1z_part2, 2, sum) * h
+
+# Then, add the sensitivities together?? I'm really not sure if this is correct?
+Pb.sens.z <- Pb.sens_part1 + Pb.sens_part2
 ```
 
 Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
 is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
-boundaries in vital rates such as survival and growth.
+boundaries in vital rates such as survival, growth, or flowering probability.
 
-VSS for $s(z)$ = $$\frac{s(z)(1-s(z))}{\lambda} \frac{\delta\lambda}{\delta s(z)}$$
-where $\frac{\delta\lambda}{\delta s(z)}$ is the sensitivity calculated above
+VSS for $s(z)$ = $$\frac{Pb(z)(1-Pb(z))}{\lambda} \frac{\delta\lambda}{\delta Pb(z)}$$
+where $\frac{\delta\lambda}{\delta Pb(z)}$ is the sensitivity calculated above
 ```{r}
-# VSS on survival 
-# first, add a '0' to the beginning of the surv.mu and surv.sd vectors (for the seedbank, which doesn't 'survive')
-surv.mu <- c(0,surv.mu) 
-surv.sd <- c(0, surv.sd) #(we'll use this later for the vr buffering analysis)
+# VSS on flowering probability 
 
 # calculate VSS 
-VSS.surv <- s.sens.z * ((surv.mu*(1-surv.mu))/lambda)
-
-# compare VSS of survival to un-corrected sensitivity to survival (the dashed line is the VSS)
-plot(s.sens.z,type = "l")
-lines(VSS.surv, lty = 2)
+VSS.flwr <- Pb.sens.z * ((flowering.mu*(1-flowering.mu))/lambda)
+# this is a matrix... is this correct? 
 ```
+
+#### Sensitivity to Seed production  $P_b(z)$
+Based on code and details from the Ellner, Childs and Rees book
+** I'm really not sure about this one, because it includes the seedbank, and also parameters that are discrete, so don't need to be integrated??
+
+Function: $$\frac{\delta\lambda}{\delta b(z_0)} = \frac{\int v(z')[goCont(Pb(z_o)c_o(z_o')) + goSB(Pb(z_o))]w(z)dz'}{\int v(z)w(z)dz}$$
+, where $v(z)$ is the reproductive value distribution and $w(z)$ is the stable size distribution
+
+Calculate the un-corrected sensitivity of the matrix to changes in the Seed production  function
+```{r}
+# after code in Ellner book
+# the first part, b(z)co(z), without the multiplcation by the discrete parameter
+dK_by_db_z1z_part1 <- outer (meshp, meshp, 
+                        function (z1, z, paramCont) {
+  FL.fun(z, paramCont) * SDS.fun(z1, paramCont) 
+  }, 
+  paramCont 
+  )
+
+## then, add a row and column of zeros to represent the seedbank %%% not sure if
+# I need to do this, but I think so, otherwise the sensitivity matrix is one
+# row and one column larger?
+dK_by_db_z1z_part1 <- cbind(0,rbind(0,dK_by_db_z1z_part1))
+
+# multiply by the sensitivity and sum across rows to do the integration, then multiply by the discrete parameter, goCont
+b.sens_part1 <- goCont * apply(S *  dK_by_db_z1z_part1, 2, sum) * h
+
+# then, do the calculation for the sensitivity of the seedbank state to Seed production 
+dK_by_db_z1z_part2 <- outer(meshp, meshp, 
+                              function(z1, z, paramCont) {
+                                FL.fun(z, paramCont) 
+                                },
+                              paramCont
+                              )
+
+## then, add a row and column of zeros to represent the seedbank %%% not sure if
+# I need to do this, but I think so, otherwise the sensitivity matrix is one
+# row and one column larger?
+dK_by_db_z1z_part2 <- cbind(0,rbind(dK_by_db_z1z_part2[1,],dK_by_db_z1z_part2))
+
+
+# multiply by the sensitivity and sum across rows to do the integration, then multiply by the discrete parameter, goCont
+b.sens_part2 <- goSB* apply(S * dK_by_db_z1z_part2, 2, sum) * h
+
+# Then, add the sensitivities together?? I'm really not sure if this is correct?
+b.sens.z <- b.sens_part1 + b.sens_part2
+```
+
+Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
+is in turn based on McDonald et al., 2017. Because this is a number (not a probability), the VSS corresponds to the elasticity, which is found by scaling the sensitivity function by (survival / lambda): 
+
+Elasticity for $s(z)$ = $$\frac{\delta \lambda}{\delta b(z)} * \frac{b(z)}{\lambda} $$
+where $\frac{\delta\lambda}{\delta Pb(z)}$ is the sensitivity calculated above
+```{r}
+# VSS on Seed production  
+
+# calculate VSS 
+VSS.seeds <- b.sens.z * c(0,SDP.fun(meshp, paramCont))/lambda
+# compare to untransformed sensitivity
+plot(VSS.seeds, type = "l")
+lines(b.sens.z, lty = 2)
+```
+
+#### Sensitivity to growth probability $G(z',z)$
+Based on code and details from the Ellner, Childs and Rees book (with no integrals, because the growth function results in a matrix?)
+
+Function: $$\frac{\delta\lambda}{\delta G(z_o',z_o)} = \frac{v(z')(1-Pb(z_o))s(z_o) w(z)}{v(z)w(z)}$$
+, where $v(z)$ is the reproductive value distribution and $w(z)$ is the stable size distribution
+
+Calculate the un-corrected sensitivity of the matrix to changes in the growth prob. function
+```{r}
+# after code in Ellner book
+# the first part, b(z)co(z), without the multiplcation by the discrete parameter
+dK_by_dG_z1z <- outer (meshp, meshp, 
+                        function (z1, z, paramCont) {
+  (1 - FL.fun(z, paramCont)) * S.fun(z, paramCont) 
+  }, 
+  paramCont 
+  )
+
+## then, add a row and column of zeros to represent the seedbank %%% not sure if
+# I need to do this, but I think so, otherwise the sensitivity matrix is one
+# row and one column larger?
+dK_by_dG_z1z <- cbind(0,rbind(0,dK_by_dG_z1z))
+
+# multiply by the sensitivity
+G.sens.z1z <-S *  dK_by_dG_z1z
+```
+
+Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
+is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
+boundaries in vital rates such as survival, growth, or flowering probability.
+
+VSS for $G(z',z)$ = $$\frac{G(z',z)(1-G(z',z))}{\lambda} \frac{\delta\lambda}{\delta G(z',z)}$$
+where $\frac{\delta\lambda}{\delta Pb(z)}$ is the sensitivity calculated above
+```{r}
+# VSS on growth probability 
+
+# calculate VSS 
+VSS.growth <- G.sens.z1z[2:501,2:501] * ((growth.mean*(1-growth.mean))/lambda)
+```
+
+
+
 # Ellner book code
 
 # function: $\frac{\delta\lambda}{\delta s(z_0)} = \frac{\int v(z')(1-P_b(z_o))G(z',z_0)w(z_0)dz'}{\int v(z)w(z)dz}$, where $v(z)$ is the reproductive value distribution and $w(z_0)$ is the stable size distribution
