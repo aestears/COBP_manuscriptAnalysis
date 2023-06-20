@@ -1005,8 +1005,7 @@ d_size       <- mesh_info$d_size
  
  
  barplot(all_sens$value, names.arg = all_sens$vr)
- 
- ```
+
  
  
 # #### read in elasticity data ####
