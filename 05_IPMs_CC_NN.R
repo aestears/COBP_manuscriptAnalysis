@@ -44,7 +44,7 @@ for (i in 1:length(unique(dat_all$Site))) {
   flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat_now, family = binomial)))
   ## Distribution of recruit size ($c_o(z')$)
   # subset the data
-  recD_now <- dat_all[dat_all$seedling == 1 & dat_all$Year == 2019,]
+  recD_now <- dat_all[dat_all$seedling == 1 & dat_all$Year == 2019 & dat_all$Site == unique(dat_all$Site)[i],]
   # fit the model
   recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
   
@@ -326,9 +326,10 @@ for (i in 1:length(unique(dat_all$Site))) {
   flwrMod_now <- suppressWarnings((glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat_now, family = binomial)))
   ## Distribution of recruit size ($c_o(z')$)
   # subset the data
-  recD_now <- dat_all[dat_all$seedling == 1 & dat_all$Year == 2020,]
+  recD_now <- dat_all[dat_all$seedling == 1 & dat_all$Year == 2020 & dat_all$Site == unique(dat_all$Site)[i],]
   # fit the model
   recMod_now <- lm(log_LL_t ~ 1, data = recD_now)
+  
   
   ## put in the parameter list (paramCont)
   paramCont <- list(
