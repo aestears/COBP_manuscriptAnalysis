@@ -278,38 +278,15 @@ SDP.fun <- function(z, paramCont) {
 }
 
 # calculate seed production based on model parameters for each IPM
-seedProd <- lapply(
+seedProd <- sapply(
   allIPMs,
   FUN = function(x)
     SDP.fun(z = meshp, paramCont = x$params)
 )
 
 
-# at this point, 'seedProd' is a list where each list element is for a subpop/year, and contains a vector of seed production
-# we need to make this into a full matrix
-# first, make the continuous part (put the seed production vector on the diagonal)
-seedProd.cont <- lapply(
-  seedProd,
-  FUN = function(x)
-    as.matrix(diag(x))
-)
-
-# add discrete part (contribution of flowering probability to the seedbank)
-seedProd.disc <- lapply(
-  seedProd,
-  FUN = function(x)
-    matrix(c(0, x), nrow = 1)
-)
-
-# combine into one matrix
-for (i in 1:length(seedProd.cont)) {
-  seedProd[[i]] <-
-    rbind(seedProd.disc[[i]], cbind(rep(0, length.out = 500),
-                                    seedProd.cont[[i]]))
-}
-
-# are there any values of 0 in the seed production matrices?
-unlist(lapply(seedProd, FUN = function(x) sum(x==0))) >0
+# are there any values of 0 in the seed production vectors?
+sum(unlist(lapply(seedProd, FUN = function(x) sum(x==0))) >0)
 
 # Since the correction that we must apply to fecundities is the
 # log-transformation, we encounter problems when the the vital rate has a value
@@ -319,8 +296,9 @@ unlist(lapply(seedProd, FUN = function(x) sum(x==0))) >0
 # a small value (0.01) to the fecundity value which is 0, over all the years of
 # the study. This way, we keep a biological meaning, and we stay consistent.
 
-seedProd <- lapply(
-  seedProd,
+seedProd <- apply(
+  X = seedProd,
+  MARGIN = 2,
   FUN =
     function(x)
       replace(x, list = which(x == 0, arr.ind = TRUE), values =
@@ -328,14 +306,28 @@ seedProd <- lapply(
 ) 
 
 #Now, calculate mean seedProd probability
-seedProd.mu <- apply(simplify2array(seedProd), 1:2, mean) 
+seedProd.mu <- apply(simplify2array(seedProd), 1, mean) 
 # this is a matrix that is an average of all of the different seed production matrices from each IPM 
 
+# plot(seedProd.mu, type = "l", ylim = c(0,13000), lwd = 2)
+# lines(seedProd[,1], lty = 2)
+# lines(seedProd[,2], lty = 2)
+# lines(seedProd[,3], lty = 2)
+# lines(seedProd[,4], lty = 2)
+# lines(seedProd[,5], lty = 2)
+# lines(seedProd[,6], lty = 2)
+# lines(seedProd[,7], lty = 2)
+# lines(seedProd[,8], lty = 2)
+# lines(seedProd[,9], lty = 2)
+# lines(seedProd[,10], lty = 2)
+# lines(seedProd[,11], lty = 2)
+# lines(seedProd[,12], lty = 2)
+
 # sd of seed production 
-seedProd.sd <- apply(simplify2array(seedProd), 1:2, sd)
+seedProd.sd <- apply(simplify2array(seedProd), 1, sd)
 
 # get the corrected sd (use a log transformation, since it is NOT a probability) 
-corr.seedProd.sd <- apply(log(simplify2array(seedProd)), 1:2 ,sd) 
+corr.seedProd.sd <- apply(log(simplify2array(seedProd)), 1 ,sd) 
 ```
 
 #### Growth $G(z',z)$
@@ -352,25 +344,68 @@ GR.fun <- function(z, zz, paramCont) {
 growth <-
   lapply(allIPMs,
     FUN = function(x)
-      h * t(outer(meshp, meshp, GR.fun, paramCont = x$params)
-            )
+      h * GR.fun(z = meshp, zz = meshp, paramCont = x$params)
+      #h * t(outer(meshp, meshp, GR.fun, paramCont = x$params) ## don't multiply by h (integrate)...should I???
+            #)
     ) 
 # 'growth' is a list in which each element contains the growth matrix for one subpop/year
     
 #Calculate the mean of growth 
-growth.mean <-
-    apply(simplify2array(growth), 1:2, mean) 
+#growth.mean <-
+    #apply(simplify2array(growth), 1:2, mean) 
+growth.mean <- apply(simplify2array(growth), 1, mean)
 
 # sd of growth 
-growth.sd <-
-    apply(simplify2array(growth), 1:2, sd) 
+#growth.sd <-
+    #apply(simplify2array(growth), 1:2, sd) 
+growth.sd <- apply(simplify2array(growth), 1, sd)
 
 # corrected sd of growth (use a logit transformation, since it is a probability)
 corr.growth.sd <-
-  apply(car::logit(simplify2array(growth), adjust = 0.001), 1:2, sd)
+  apply(car::logit(simplify2array(growth),adjust = .001), 1, sd)
 ```
 
-#### We don't calculate mean and sd values for seedbank parameters and seedling size distribution, because those values were calculated at the population level (so there is no variation accross subpopulations)
+#### seedling size distribution $c_0(z)$
+Use the seedling size distribution function w/ parameters for each IPM to calculate the growth for each IPM
+```{r}
+ ## SEEDLING SIZES (same approach as in growth function)
+  SDS.fun <- function(zz, paramCont){
+    rec_mu <- paramCont$c_o_mu
+    rec_sd <- paramCont$c_o_sd
+    return(dnorm(zz, mean = rec_mu, sd = rec_sd))
+  }
+# calculate the growth matrix based on model parameters for each IPM
+seedlingSize <-
+  lapply(allIPMs,
+    FUN = function(x)
+      h * SDS.fun(zz = meshp, paramCont = x$params) 
+    ) 
+# 'seedling size' is a list in which each element contains the growth matrix for one subpop/year
+    
+#Calculate the mean of seedling size
+#growth.mean <-
+    #apply(simplify2array(growth), 1:2, mean) 
+seedlingSize.mean <- apply(simplify2array(seedlingSize), 1, mean)
+
+# sd of SeedlingSize 
+#SeedlingSize.sd <-
+    #apply(simplify2array(SeedlingSize), 1:2, sd) 
+seedlingSize.sd <- apply(simplify2array(seedlingSize), 1, sd)
+
+# corrected sd of SeedlingSize (use a logit transformation, since it is a probability)
+corr.seedlingSize.sd <-
+  apply(car::logit(simplify2array(seedlingSize),adjust = .001), 1, sd)
+```
+
+#### We don't calculate mean for seedbank parameters and seedling size distribution, because those values were calculated at the population level (so there is no variation accross subpopulations). We simulate standard deviation for these vital rates as the maximum possible? %%% not too sure about this
+
+```{r}
+corr.outSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
+corr.staySB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
+corr.goCont.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
+corr.goSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
+```
+
 
 ## Calculate Sensitivity 
 
@@ -379,8 +414,6 @@ Then, we calculate the corrected sensitivity for each rate according to McDonald
 
 We calculate the vital rate sensitivities based on the matrix from IPM B (called "mat_all_DI") (IPM for all sites and both transitions) (I think this is correct? not too sure? Should I calculate it from the mean matrix from all 12 subpop/year IPMs instead?)
 
-
-### Calculate vital rate sensitivity
 #### Preparation
 
 First, get parameter values used to make the all pops, all transitions IPM, and save in a list
@@ -467,11 +500,10 @@ h=(U-L)/n # bin width
 surv_OG <- S.fun(meshp, paramCont)
   
 # growth
-growth_OG <- t(outer(meshp,meshp,GR.fun, paramCont)) # don't multiply by h... so no integration? is this correct?
+growth_OG <- h * GR.fun(z = meshp, zz = meshp, paramCont = paramCont) # don't multiply by h... so no integration? is this correct?
 
 # seedling size distribution
-seedlingSize_OG <-  matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F) # don't multiply by h... so no integration? is this correct?
-
+seedlingSize_OG <-  h * SDS.fun(zz = meshp, paramCont = paramCont)
 # probability of flowering
 flowering_OG <- (FL.fun(meshp, paramCont))
 
@@ -823,10 +855,10 @@ Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 ipm_perturb_Growth <-Pkernel+Fkernel
 
 eigenMat <- eigen(ipm_perturb_Growth)
-# get and save the purturbed lambda
+# get and save the perturbed lambda
 lambda_perturb_Growth <-eigenMat$values[1]
-# get and save the purturbed vital rate function
-G_perturb <- t(outer(meshp,meshp,GR.fun_pert, paramCont))
+# get and save the perturbed vital rate function
+G_perturb <- h * GR.fun_pert(z = meshp, zz = meshp, paramCont = paramCont )
 ```
 
 Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
@@ -837,17 +869,483 @@ sens_Growth <- as.numeric(lambda_perturb_Growth - lambda_OG) / (G_perturb - grow
 #image(sens_Growth)
 ```
 
+
 Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
 is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
 boundaries in vital rates such as survival, growth, or flowering probability.
 
-VSS for $G(z',z)$ = $$\frac{G(z',z)(1-G(z',z))}{\lambda} \frac{\delta\lambda}{\delta G(z',z)}$$
-where $\frac{\delta\lambda}{\delta Pb(z)}$ is the sensitivity calculated above
+VSS for $s(z)$ = $$\frac{G(z',z)(1-G(z',z))}{\lambda} \frac{\delta\lambda}{\delta G(z',z)}$$
+
+where $\frac{\delta\lambda}{\delta G(z',z)}$ is the sensitivity calculated above
 ```{r}
-# VSS on growth probability 
+# VSS on growth ≈
 
 # calculate VSS 
-VSS.growth <- sens_Growth * ((growth.mean*(1-growth.mean))/as.numeric(lambda_OG))
-#image(VSS.growth)
+# version for non-probability vital rate
+# VSS.growth <- sens_Growth * (growth_OG/as.numeric(lambda_OG))
+# version for probability vital rate
+VSS.growth <- as.numeric(sens_Growth * ((growth.mean*(1-growth.mean))/lambda_OG))
+
+plot(VSS.growth, type = "l")
+lines(sens_Growth, lty = 2)
 ```
+
+#### Sensitivity to seedling recruit size
+ 
+Calculate the un-corrected sensitivity of the IPM matrix to changes in the growth probability function by calculating the IPM matrix with slightly perturbed seedling recruit size probability function 
+```{r}
+# Setting up the kernels
+K <- array(0,c(n+1,n+1))
+b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+h=(U-L)/n # bin width 
+
+## set the perturbation value (should be ~1% of the vital rate value)
+perturbVal <- .01
+
+## redefine the recruit size probability distribution 
+## SEEDLING SIZES (same approach as in growth function)
+SDS.fun_pert <- function(zz, paramCont){
+  rec_mu <- paramCont[["recruitDist"]][1] + perturbVal
+  rec_sd <- paramCont[["recruitDist"]][2]
+  return(dnorm(zz, mean = rec_mu, sd = rec_sd))
+}
+
+# Survival and growth 
+S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
+
+#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+c_o <- h * matrix(rep(SDS.fun_pert(meshp, paramCont),n),n,n,byrow=F)
+
+#Probability of flowering
+Pb = (FL.fun(meshp, paramCont))
+
+#Number of seeds produced according to adult size
+b_seed = (SDP.fun(meshp, paramCont))
+
+FecALL= Pb * b_seed
+
+# update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+S_new <- S * (1-(Pb))
+
+# Control for eviction:
+# this is equivalent to redistributing evicted sizes evenly among existing size classes 
+G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+
+# make the continuous part of the P matrix
+Pkernel.cont <- as.matrix(G %*% S_new)
+
+# seedbank (first column of your K)
+Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+
+# Make the full P kernel
+Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+
+## make the F kernel
+Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+
+Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+
+Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+
+ipm_perturb_SeedlingSize <-Pkernel+Fkernel
+
+eigenMat <- eigen(ipm_perturb_SeedlingSize)
+# get and save the perturbed lambda
+lambda_perturb_SeedlingSize <-eigenMat$values[1]
+# get and save the perturbed vital rate function
+c_o_perturb <- h * SDS.fun_pert(zz = meshp, paramCont = paramCont) 
+```
+
+Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
+$$Sens_{c_0(z)} = \frac{\Delta\lambda}{\Delta c_0(z)} = \frac{\lambda_{perturb} - \lambda_{original}}{c_0(z)_{perturb} - c_0(z)_{original}}$$
+```{r}
+sens_SeedlingSize <- as.numeric(lambda_perturb_SeedlingSize - lambda_OG) / (c_o_perturb - seedlingSize_OG)
+
+#image(sens_Growth)
+```
+Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
+is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
+boundaries in vital rates such as survival, growth, or flowering probability.
+
+VSS for $s(z)$ = $$\frac{c_0(z)(1-c_0(z))}{\lambda} \frac{\delta\lambda}{\delta c_0(z)}$$
+
+where $\frac{\delta\lambda}{\delta c_0(z)}$ is the sensitivity calculated above
+```{r}
+# VSS on SeedlingSize 
+VSS.SeedlingSize <- as.numeric(sens_SeedlingSize * ((seedlingSize.mean*(1-seedlingSize.mean))/lambda_OG))
+
+plot(VSS.SeedlingSize, type = "l")
+lines(sens_SeedlingSize, lty = 2)
+```
+
+#### Sensitivity to probability of leaving the seedbank
+ 
+Calculate the un-corrected sensitivity of the IPM matrix to changes in the outSB probability function by calculating the IPM matrix with slightly perturbed seedling recruit size probability function 
+```{r}
+# Setting up the kernels
+K <- array(0,c(n+1,n+1))
+b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+h=(U-L)/n # bin width 
+
+## set the perturbation value (should be ~1% of the vital rate value)
+perturbVal <- .01
+
+## redefine the recruit size probability distribution 
+## SEEDLING SIZES (same approach as in outSB function)
+outSB_perturb <- outSB + perturbVal
+
+# Survival and growth 
+S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
+
+#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
+
+#Probability of flowering
+Pb = (FL.fun(meshp, paramCont))
+
+#Number of seeds produced according to adult size
+b_seed = (SDP.fun(meshp, paramCont))
+
+FecALL= Pb * b_seed
+
+# update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+S_new <- S * (1-(Pb))
+
+# Control for eviction:
+# this is equivalent to redistributing evicted sizes evenly among existing size classes 
+G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+
+# make the continuous part of the P matrix
+Pkernel.cont <- as.matrix(G %*% S_new)
+
+# seedbank (first column of your K)
+Pkernel.seedbank = c(staySB, outSB_perturb*c_o[,1]) # seeds survive and go to continuous
+
+# Make the full P kernel
+Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+
+## make the F kernel
+Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+
+Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+
+Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+
+ipm_perturb_outSB <-Pkernel+Fkernel
+
+eigenMat <- eigen(ipm_perturb_outSB)
+# get and save the perturbed lambda
+lambda_perturb_outSB <-eigenMat$values[1]
+```
+
+Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
+$$Sens_{outSB} = \frac{\Delta\lambda}{\Delta outSB} = \frac{\lambda_{perturb} - \lambda_{original}}{outSB_{perturb} - outSB_{original}}$$
+```{r}
+sens_outSB <- as.numeric(lambda_perturb_outSB - lambda_OG) / (outSB_perturb - outSB)
+
+```
+Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
+is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
+boundaries in vital rates such as survival, growth, or flowering probability.
+
+VSS for $s(z)$ = $$\frac{outSB(1-outSB)}{\lambda} \frac{\delta\lambda}{\delta outSB}$$
+
+where $\frac{\delta\lambda}{\delta c_0(z)}$ is the sensitivity calculated above
+```{r}
+# VSS on outSB ≈
+
+VSS.outSB <- as.numeric(sens_outSB * ((outSB*(1-outSB))/lambda_OG))
+```
+
+#### Sensitivity to probability of staying in the seedbank
+ 
+Calculate the un-corrected sensitivity of the IPM matrix to changes in the staySB probability function by calculating the IPM matrix with slightly perturbed seedling recruit size probability function 
+```{r}
+# Setting up the kernels
+K <- array(0,c(n+1,n+1))
+b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+h=(U-L)/n # bin width 
+
+## set the perturbation value (should be ~1% of the vital rate value)
+perturbVal <- .01
+
+## redefine the recruit size probability distribution 
+staySB_perturb <- staySB + perturbVal
+
+# Survival and growth 
+S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
+
+#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
+
+#Probability of flowering
+Pb = (FL.fun(meshp, paramCont))
+
+#Number of seeds produced according to adult size
+b_seed = (SDP.fun(meshp, paramCont))
+
+FecALL= Pb * b_seed
+
+# update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+S_new <- S * (1-(Pb))
+
+# Control for eviction:
+# this is equivalent to redistributing evicted sizes evenly among existing size classes 
+G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+
+# make the continuous part of the P matrix
+Pkernel.cont <- as.matrix(G %*% S_new)
+
+# seedbank (first column of your K)
+Pkernel.seedbank = c(staySB_perturb, outSB*c_o[,1]) # seeds survive and go to continuous
+
+# Make the full P kernel
+Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+
+## make the F kernel
+Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+
+Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+
+Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+
+ipm_perturb_staySB <-Pkernel+Fkernel
+
+eigenMat <- eigen(ipm_perturb_staySB)
+# get and save the perturbed lambda
+lambda_perturb_staySB <-eigenMat$values[1]
+```
+
+Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
+$$Sens_{staySB} = \frac{\Delta\lambda}{\Delta staySB} = \frac{\lambda_{perturb} - \lambda_{original}}{staySB_{perturb} - staySB_{original}}$$
+```{r}
+sens_staySB <- as.numeric(lambda_perturb_staySB - lambda_OG) / (staySB_perturb - staySB)
+
+```
+Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
+is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
+boundaries in vital rates such as survival, growth, or flowering probability.
+
+VSS for $s(z)$ = $$\frac{staySB(1-staySB)}{\lambda} \frac{\delta\lambda}{\delta staySB}$$
+
+where $\frac{\delta\lambda}{\delta c_0(z)}$ is the sensitivity calculated above
+```{r}
+# VSS on staySB ≈
+
+VSS.staySB <- as.numeric(sens_staySB * ((staySB*(1-staySB))/lambda_OG))
+```
+
+#### Sensitivity to probability of skipping the seedbank and going to the continuous stage
+ 
+Calculate the un-corrected sensitivity of the IPM matrix to changes in the goCont probability function by calculating the IPM matrix with slightly perturbed seedling recruit size probability function 
+```{r}
+# Setting up the kernels
+K <- array(0,c(n+1,n+1))
+b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+h=(U-L)/n # bin width 
+
+## set the perturbation value (should be ~1% of the vital rate value)
+perturbVal <- .01
+
+## redefine the recruit size probability distribution 
+## SEEDLING SIZES (same approach as in outSB function)
+goCont_perturb <- goCont + perturbVal
+
+# Survival and growth 
+S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
+
+#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
+
+#Probability of flowering
+Pb = (FL.fun(meshp, paramCont))
+
+#Number of seeds produced according to adult size
+b_seed = (SDP.fun(meshp, paramCont))
+
+FecALL= Pb * b_seed
+
+# update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+S_new <- S * (1-(Pb))
+
+# Control for eviction:
+# this is equivalent to redistributing evicted sizes evenly among existing size classes 
+G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+
+# make the continuous part of the P matrix
+Pkernel.cont <- as.matrix(G %*% S_new)
+
+# seedbank (first column of your K)
+Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+
+# Make the full P kernel
+Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+
+## make the F kernel
+Fkernel.cont <-  as.matrix(goCont_perturb * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+
+Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+
+Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+
+ipm_perturb_goCont <-Pkernel+Fkernel
+
+eigenMat <- eigen(ipm_perturb_goCont)
+# get and save the perturbed lambda
+lambda_perturb_goCont <-eigenMat$values[1]
+```
+
+Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
+$$Sens_{goCont} = \frac{\Delta\lambda}{\Delta goCont} = \frac{\lambda_{perturb} - \lambda_{original}}{goCont_{perturb} - goCont_{original}}$$
+```{r}
+sens_goCont <- as.numeric(lambda_perturb_goCont - lambda_OG) / (goCont_perturb - goCont)
+
+```
+Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
+is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
+boundaries in vital rates such as survival, growth, or flowering probability.
+
+VSS for $s(z)$ = $$\frac{goCont(1-goCont)}{\lambda} \frac{\delta\lambda}{\delta goCont}$$
+
+where $\frac{\delta\lambda}{\delta c_0(z)}$ is the sensitivity calculated above
+```{r}
+# VSS on goCont
+
+VSS.goCont <- as.numeric(sens_goCont * ((goCont*(1-goCont))/lambda_OG))
+```
+
+#### Sensitivity to probability of going into the seedbank
+ 
+Calculate the un-corrected sensitivity of the IPM matrix to changes in the goSB probability function by calculating the IPM matrix with slightly perturbed seedling recruit size probability function 
+```{r}
+# Setting up the kernels
+K <- array(0,c(n+1,n+1))
+b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+h=(U-L)/n # bin width 
+
+## set the perturbation value (should be ~1% of the vital rate value)
+perturbVal <- .01
+
+## redefine the recruit size probability distribution 
+## SEEDLING SIZES (same approach as in outSB function)
+goSB_perturb <- goSB + perturbVal
+
+# Survival and growth 
+S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
+
+#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
+
+#Probability of flowering
+Pb = (FL.fun(meshp, paramCont))
+
+#Number of seeds produced according to adult size
+b_seed = (SDP.fun(meshp, paramCont))
+
+FecALL= Pb * b_seed
+
+# update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+S_new <- S * (1-(Pb))
+
+# Control for eviction:
+# this is equivalent to redistributing evicted sizes evenly among existing size classes 
+G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+
+# make the continuous part of the P matrix
+Pkernel.cont <- as.matrix(G %*% S_new)
+
+# seedbank (first column of your K)
+Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+
+# Make the full P kernel
+Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+
+## make the F kernel
+Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+
+Fkernel.discr  <- matrix(c(0, goSB_perturb * (FecALL)), nrow = 1)
+
+Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+
+ipm_perturb_goSB <-Pkernel+Fkernel
+
+eigenMat <- eigen(ipm_perturb_goSB)
+# get and save the perturbed lambda
+lambda_perturb_goSB <-eigenMat$values[1]
+```
+
+Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
+$$Sens_{goSB} = \frac{\Delta\lambda}{\Delta goSB} = \frac{\lambda_{perturb} - \lambda_{original}}{goSB_{perturb} - goSB_{original}}$$
+```{r}
+sens_goSB <- as.numeric(lambda_perturb_goSB - lambda_OG) / (goSB_perturb - goSB)
+
+```
+Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
+is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
+boundaries in vital rates such as survival, growth, or flowering probability.
+
+VSS for $s(z)$ = $$\frac{goSB(1-goSB)}{\lambda} \frac{\delta\lambda}{\delta goSB}$$
+
+where $\frac{\delta\lambda}{\delta c_0(z)}$ is the sensitivity calculated above
+```{r}
+# VSS on goSB
+
+VSS.goSB <- as.numeric(sens_goSB * ((goSB*(1-goSB))/lambda_OG))
+```
+
+## Compare VSS and corrected standard deviation of vital rates (to look for evidence of demographic buffering hypothesis[DBH])
+Support for DBH: a negative correlation between vital rate importance (VSS) and vital rate variation (corrected sd)
+
+Do this for each vital rate size class
+
+```{r}
+# put all the vital rates into one data.frame
+bigDF <- data.frame("VitalRate" = c(rep("surv", 500), rep("seedProd", 500), rep("flowerProb", 500), rep("growth", 500), rep("seedlingSize", 500)),
+                    "sizeClass" = rep(1:500, times = 5),
+                    "VSS" = c(VSS.surv, VSS.seeds, VSS.flwr, VSS.growth, VSS.SeedlingSize), 
+                    "correctedSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd, corr.growth.sd, corr.seedlingSize.sd)
+                    )
+
+for (i in 1:500) {
+  # calculate the correlation
+  cor_temp <- cor.test(c(bigDF[bigDF$sizeClass == i, "VSS"], VSS.outSB, VSS.staySB, VSS.goCont, VSS.goSB), 
+                       c(bigDF[bigDF$sizeClass == i, "correctedSD"], corr.outSB.sd, corr.staySB.sd, corr.goCont.sd, corr.goSB.sd),
+                       method = "pearson")
+  
+  
+  ggplot(data = bigDF[bigDF$sizeClass == i,]) +
+    geom_point(aes(x = VSS, y = correctedSD, col = VitalRate)) + 
+    geom_smooth(aes(x = VSS, y = correctedSD), method = "lm", se = FALSE, col = "grey20") +
+    theme_minimal()
+  
+  # save the correlation
+  if (i == 1) {
+    correlations <- data.frame("sizeClass" = i, "correlation" = cor_temp$estimate, "corr_pVal" = cor_temp$p.value, "corr_confIntLow" = cor_temp$conf.int[1], "corr_confIntHigh" = cor_temp$conf.int[2])
+  } else {
+   correlations <-  rbind(correlations, data.frame("sizeClass" = i, "correlation" = cor_temp$estimate, "corr_pVal" = cor_temp$p.value, "corr_confIntLow" = cor_temp$conf.int[1], "corr_confIntHigh" = cor_temp$conf.int[2]))
+  }
+}
+
+# visualize the correlation coefficients for each size class 
+ggplot(data = correlations) +
+  geom_ribbon(aes(ymin = corr_confIntLow, ymax = corr_confIntHigh, x = 1:500), fill = "lightgrey", alpha = .5) +
+  geom_point(aes(x = sizeClass, y = correlation, col = corr_pVal)) + 
+  theme_minimal()
+```
+
 
