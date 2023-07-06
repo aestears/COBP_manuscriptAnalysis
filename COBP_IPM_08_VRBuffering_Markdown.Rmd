@@ -34,9 +34,9 @@ where:
 -   $c_o(z')$ is the distribution of above-ground recruit size in
     year *t+1*        
 -   $goCont$ is the discrete probability of a seed produced in year *t* germinating as a seedling in year *t+1*       
--   $outSB$ is the discrete probability of a seed from the seedbank in year *t* germinating as a seedling in year *t+1*       
--   $goSB$ is the discrete probability of a seed produced in year *t* going to the seedbank in year *t+1*       
--   $staySB$ is the discrete probability of a seedbank seed in year *t* persisting in the seedbank in year *t+1*        
+-   $outSB$ is the discrete probability of a seed from the sandbank in year *t* germinating as a seedling in year *t+1*       
+-   $goSB$ is the discrete probability of a seed produced in year *t* going to the sandbank in year *t+1*       
+-   $staySB$ is the discrete probability of a sandbank seed in year *t* persisting in the sandbank in year *t+1*        
 
 ## Prepare to make IPMs
 
@@ -50,9 +50,9 @@ dat_all <- read.csv(file = paste0(datFolder, "/allDat_plus_contSeedlings.csv"))
 ```
 
 ## Make IPMs 
-Below is example code showing how I created an IPM for one of the six sub-populations. In this analysis, I calculated an IPM for each sub-population in each transition (a total of 12 IPMs, called IPMs CC through NN), which were used to calculate the mean and standard deviations of each vital rate. I also calculated an IPM using data from all subpopulations in both transitions, which I used to calculate sensitivity and elasticity for each vital rate. All of these IPMs used the same structure, but had different vital rate function parameters. 
+Below is example code showing how I created an IPM for one of the six sub-populations. In this analysis, I calculated an IPM for each sub-population in each transition (a total of 12 IPMs, called IPMs CC through NN), which were used to calculate the mean and standard deviations of each vital rate. I also calculated an IPM using data from all sub-populations in both transitions, which I used to calculate sensitivity and elasticity for each vital rate. All of these IPMs used the same structure, but had different vital rate function parameters. 
 ```{r, eval = FALSE}
-# establish upper and lower bounds of the continous state
+# establish upper and lower bounds of the continuous state
 L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum ln(size), -2.8
 U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum ln(size), 4.4
 
@@ -62,7 +62,7 @@ n <-500 # bins
 outSB <- outSB_all #SB to continuous stage, 0.14
 staySB <- staySB_all # staying in SB, 0.75
 goCont <- goCont_all # seeds become continuous right away (without going to the seed bank), 0.09
-goSB <- goSB_all # seeds go to the seedbank, 0.49
+goSB <- goSB_all # seeds go to the sandbank, 0.49
 surv.seeds <-  0.9 # survival of seeds
 
 ## make an IPM for the "Crow Creek" site in the 2019-2020 transition
@@ -147,7 +147,7 @@ i <- 1
   S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
   G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
   # G <- t(outer(meshp,meshp,GR.fun)) # Growth
-  #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+  #Recruits distribution (seeds recruited from the sandbank into the continuous stage)
   c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
   # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
   #Probability of flowering
@@ -163,7 +163,7 @@ i <- 1
   c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
   # make the continuous part of the P matrix
   Pkernel.cont <- as.matrix(G %*% S_new)
-  # seedbank (first column of your K)
+  # sandbank (first column of your K)
   Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
   # Make the full P kernel
   Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
@@ -188,7 +188,7 @@ i <- 1
 ```
 #### To save time, we can load the saved IPMs that were calculated previously
 ```{r, message=FALSE}
-# subpopulation-level, each transition IPMs
+# sub population-level, each transition IPMs
 IPMs_CC_HH <- readRDS(paste0(datFolder,"IPMs_CC_HH.RDS"))
 IPMs_II_NN <- readRDS(paste0(datFolder,"IPMs_II_NN.RDS"))
 # all populations, all transitions IPM
@@ -198,7 +198,7 @@ load(paste0(datFolder,"ipmA_B_results.RData"))
 ## Calculate mean and corrected standard deviation of Vital Rates
 #### * Based on the VSS code for matrix models that Maria Paniw shared
 
-Put all of the IPMs for each subpopulation/transition into one big list
+Put all of the IPMs for each sub population/transition into one big list
 ```{r}
 allIPMs <- c(IPMs_II_NN, IPMs_CC_HH)
 
@@ -399,6 +399,8 @@ corr.seedlingSize.sd <-
 
 #### We don't calculate mean for seedbank parameters and seedling size distribution, because those values were calculated at the population level (so there is no variation accross subpopulations). We simulate standard deviation for these vital rates as the maximum possible? %%% not too sure about this
 
+First, simulate the maximum standard deviation for each sandbank vital rate 
+
 ```{r}
 corr.outSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
 corr.staySB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
@@ -406,6 +408,13 @@ corr.goCont.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
 corr.goSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
 ```
 
+Then, simulate the minimum standard deviatino for each sandbank vital rate 
+```{r}
+corr.outSB.sd_min <- sd(car::logit(seq(from = outSB*.9, to = outSB*1.1, length.out = 20)))
+corr.staySB.sd_min <- sd(car::logit(seq(from = staySB*.9, to = staySB*1.1, length.out = 20)))
+corr.goCont.sd_min <- sd(car::logit(seq(from = goCont*.9, to = goCont*1.1, length.out = 20)))
+corr.goSB.sd_min <- sd(car::logit(seq(from = goSB*.9, to = goSB*1.1, length.out = 20)))
+```
 
 ## Calculate Sensitivity 
 
@@ -440,7 +449,7 @@ These are the parameters for the discrete stages
 outSB <- outSB_all #SB to continuous stage
 staySB <- staySB_all # staying in SB
 goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
-goSB <- goSB_all # seeds go to the seedbank
+goSB <- goSB_all # seeds go to the sandbank
 surv.seeds <-  0.9 # survival of seeds
 ```
 
@@ -484,7 +493,7 @@ SDP.fun <- function(z, paramCont) {
 }
 ```
 
-Save the lambda and vital rate function values from the unpurturbed IPM
+Save the lambda and vital rate function values from the unperturbed IPM
 ```{r}
 # lambda value
 lambda_OG <- lam_all_DI
@@ -533,7 +542,7 @@ S<- diag(S.fun_pert(meshp, paramCont)) # Survival # put survival probabilities i
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 # G <- t(outer(meshp,meshp,GR.fun)) # Growth
 
-#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+#Recruits distribution (seeds recruited from the sandbank into the continuous stage)
 c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
 # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
 
@@ -556,7 +565,7 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
-# seedbank (first column of your K)
+# sandbank (first column of your K)
 Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
 
 # Make the full P kernel
@@ -572,9 +581,9 @@ Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 ipm_perturb_Survival <-Pkernel+Fkernel
 
 eigenMat <- eigen(ipm_perturb_Survival)
-# get and save the purturbed lambda
+# get and save the perturbed lambda
 lambda_perturb_Survival <-eigenMat$values[1]
-# get and save the purturbed vital rate function
+# get and save the perturbed vital rate function
 s_perturb <- S.fun_pert(meshp, paramCont)
 ```
 
@@ -594,7 +603,7 @@ VSS for $s(z)$ = $$\frac{s(z)(1-s(z))}{\lambda} \frac{\delta\lambda}{\delta s(z)
 where $\frac{\delta\lambda}{\delta s(z)}$ is the sensitivity calculated above
 ```{r}
 # VSS on survival 
-# first, add a '0' to the beginning of the surv.mu and surv.sd vectors (for the seedbank, which doesn't 'survive')
+# first, add a '0' to the beginning of the surv.mu and surv.sd vectors (for the sandbank, which doesn't 'survive')
 # called "surv.mu" and "surv.sd" #(we'll use this later for the vr buffering analysis)
 
 # calculate VSS 
@@ -630,7 +639,7 @@ S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in th
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 # G <- t(outer(meshp,meshp,GR.fun)) # Growth
 
-#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+#Recruits distribution (seeds recruited from the sandbank into the continuous stage)
 c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
 # c_o <- matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
 
@@ -653,7 +662,7 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
-# seedbank (first column of your K)
+# sandbank (first column of your K)
 Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
 
 # Make the full P kernel
@@ -725,7 +734,7 @@ SDP.fun_pert <- function(z, paramCont) {
 S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 
-#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+#Recruits distribution (seeds recruited from the sandbank into the continuous stage)
 c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
 
 #Probability of flowering
@@ -747,7 +756,7 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
-# seedbank (first column of your K)
+# sandbank (first column of your K)
 Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
 
 # Make the full P kernel
@@ -763,9 +772,9 @@ Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 ipm_perturb_SeedProd <-Pkernel+Fkernel
 
 eigenMat <- eigen(ipm_perturb_SeedProd)
-# get and save the purturbed lambda
+# get and save the perturbed lambda
 lambda_perturb_SeedProd <-eigenMat$values[1]
-# get and save the purturbed vital rate function
+# get and save the perturbed vital rate function
 b_perturb <- SDP.fun_pert(meshp, paramCont)
 ```
 
@@ -817,7 +826,7 @@ GR.fun_pert <- function(z,zz, paramCont){
 S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun_pert, paramCont)) # Growth
 
-#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+#Recruits distribution (seeds recruited from the sandbank into the continuous stage)
 c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
 
 #Probability of flowering
@@ -839,7 +848,7 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
-# seedbank (first column of your K)
+# sandbank (first column of your K)
 Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
 
 # Make the full P kernel
@@ -915,7 +924,7 @@ SDS.fun_pert <- function(zz, paramCont){
 S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 
-#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+#Recruits distribution (seeds recruited from the sandbank into the continuous stage)
 c_o <- h * matrix(rep(SDS.fun_pert(meshp, paramCont),n),n,n,byrow=F)
 
 #Probability of flowering
@@ -937,7 +946,7 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
-# seedbank (first column of your K)
+# sandbank (first column of your K)
 Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
 
 # Make the full P kernel
@@ -1002,7 +1011,7 @@ outSB_perturb <- outSB + perturbVal
 S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 
-#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+#Recruits distribution (seeds recruited from the sandbank into the continuous stage)
 c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
 
 #Probability of flowering
@@ -1024,7 +1033,7 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
-# seedbank (first column of your K)
+# sandbank (first column of your K)
 Pkernel.seedbank = c(staySB, outSB_perturb*c_o[,1]) # seeds survive and go to continuous
 
 # Make the full P kernel
@@ -1083,7 +1092,7 @@ staySB_perturb <- staySB + perturbVal
 S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 
-#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+#Recruits distribution (seeds recruited from the sandbank into the continuous stage)
 c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
 
 #Probability of flowering
@@ -1105,7 +1114,7 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
-# seedbank (first column of your K)
+# sandbank (first column of your K)
 Pkernel.seedbank = c(staySB_perturb, outSB*c_o[,1]) # seeds survive and go to continuous
 
 # Make the full P kernel
@@ -1165,7 +1174,7 @@ goCont_perturb <- goCont + perturbVal
 S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 
-#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+#Recruits distribution (seeds recruited from the sandbank into the continuous stage)
 c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
 
 #Probability of flowering
@@ -1187,7 +1196,7 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
-# seedbank (first column of your K)
+# sandbank (first column of your K)
 Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
 
 # Make the full P kernel
@@ -1247,7 +1256,7 @@ goSB_perturb <- goSB + perturbVal
 S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 
-#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+#Recruits distribution (seeds recruited from the sandbank into the continuous stage)
 c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
 
 #Probability of flowering
@@ -1269,7 +1278,7 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 
-# seedbank (first column of your K)
+# sandbank (first column of your K)
 Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
 
 # Make the full P kernel
@@ -1311,41 +1320,92 @@ VSS.goSB <- as.numeric(sens_goSB * ((goSB*(1-goSB))/lambda_OG))
 ## Compare VSS and corrected standard deviation of vital rates (to look for evidence of demographic buffering hypothesis[DBH])
 Support for DBH: a negative correlation between vital rate importance (VSS) and vital rate variation (corrected sd)
 
-Do this for each vital rate size class
+#### Do this for each vital rate size class (w/ the simulated *maximum* possible standard deviation for each sandbank vital rate)
 
 ```{r}
+
 # put all the vital rates into one data.frame
 bigDF <- data.frame("VitalRate" = c(rep("surv", 500), rep("seedProd", 500), rep("flowerProb", 500), rep("growth", 500), rep("seedlingSize", 500)),
-                    "sizeClass" = rep(1:500, times = 5),
+                    "sizeClass" = rep(meshp, times = 5),
                     "VSS" = c(VSS.surv, VSS.seeds, VSS.flwr, VSS.growth, VSS.SeedlingSize), 
                     "correctedSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd, corr.growth.sd, corr.seedlingSize.sd)
                     )
 
 for (i in 1:500) {
+  meshp_i <- unique(bigDF$sizeClass)[i]
   # calculate the correlation
-  cor_temp <- cor.test(c(bigDF[bigDF$sizeClass == i, "VSS"], VSS.outSB, VSS.staySB, VSS.goCont, VSS.goSB), 
-                       c(bigDF[bigDF$sizeClass == i, "correctedSD"], corr.outSB.sd, corr.staySB.sd, corr.goCont.sd, corr.goSB.sd),
+  cor_temp <- cor.test(c(bigDF[bigDF$sizeClass == meshp_i, "VSS"], VSS.outSB, VSS.staySB, VSS.goCont, VSS.goSB), 
+                       c(bigDF[bigDF$sizeClass == meshp_i, "correctedSD"], corr.outSB.sd, corr.staySB.sd, corr.goCont.sd, corr.goSB.sd),
                        method = "pearson")
   
   
-  ggplot(data = bigDF[bigDF$sizeClass == i,]) +
-    geom_point(aes(x = VSS, y = correctedSD, col = VitalRate)) + 
-    geom_smooth(aes(x = VSS, y = correctedSD), method = "lm", se = FALSE, col = "grey20") +
-    theme_minimal()
+  # ggplot(data = bigDF[bigDF$sizeClass == meshp_i]) +
+  #   geom_point(aes(x = VSS, y = correctedSD, col = VitalRate)) + 
+  #   geom_point(data = (data.frame("VitalRate" = c("outSB", "staySB", "goCont", "goSB"), 
+  #                                 "VSS" = c(VSS.outSB, VSS.staySB, VSS.goCont, VSS.goSB), 
+  #                                 "correctedSD" = c(corr.outSB.sd_min, corr.staySB.sd_min, corr.goCont.sd_min, corr.goSB.sd_min))), aes(x = VSS, y = correctedSD)) +
+  #   geom_smooth(aes(x = VSS, y = correctedSD), method = "lm", se = FALSE, col = "grey20") +
+  #   theme_minimal()
   
   # save the correlation
   if (i == 1) {
-    correlations <- data.frame("sizeClass" = i, "correlation" = cor_temp$estimate, "corr_pVal" = cor_temp$p.value, "corr_confIntLow" = cor_temp$conf.int[1], "corr_confIntHigh" = cor_temp$conf.int[2])
+    correlations <- data.frame("sizeClass" = meshp_i, "correlation" = cor_temp$estimate, "corr_pVal" = cor_temp$p.value, "corr_confIntLow" = cor_temp$conf.int[1], "corr_confIntHigh" = cor_temp$conf.int[2])
   } else {
-   correlations <-  rbind(correlations, data.frame("sizeClass" = i, "correlation" = cor_temp$estimate, "corr_pVal" = cor_temp$p.value, "corr_confIntLow" = cor_temp$conf.int[1], "corr_confIntHigh" = cor_temp$conf.int[2]))
+   correlations <-  rbind(correlations, data.frame("sizeClass" = meshp_i, "correlation" = cor_temp$estimate, "corr_pVal" = cor_temp$p.value, "corr_confIntLow" = cor_temp$conf.int[1], "corr_confIntHigh" = cor_temp$conf.int[2]))
   }
 }
-
-# visualize the correlation coefficients for each size class 
-ggplot(data = correlations) +
-  geom_ribbon(aes(ymin = corr_confIntLow, ymax = corr_confIntHigh, x = 1:500), fill = "lightgrey", alpha = .5) +
-  geom_point(aes(x = sizeClass, y = correlation, col = corr_pVal)) + 
-  theme_minimal()
 ```
 
+```{r}
+# visualize the correlation coefficients for each size class 
+ggplot(data = correlations) +
+  geom_ribbon(aes(ymin = corr_confIntLow, ymax = corr_confIntHigh, x = meshp), fill = "lightgrey", alpha = .5) +
+  geom_point(aes(x = sizeClass, y = correlation, col = corr_pVal)) + 
+  geom_point(data = correlations[correlations$corr_pVal <=.05,], aes(x = sizeClass, y = correlation), pch = 5) +
+  theme_minimal()+ 
+  xlab("Size Class (ln(cm))")
+```
 
+There is not a significant correlation, either negative or positive, between vital rate VSS and corrected standard deviation in any size class (this assumes the maximum possible variation for sandbank parameters). 95% confidence intervals for the correlation estimate are shown in grey.
+
+
+#### Do this for each vital rate size class (w/ the simulated *minimum* possible standard deviation for each sandbank vital rate)
+
+```{r}
+
+for (i in 1:500) {
+  meshp_i <- unique(bigDF$sizeClass)[i]
+  # calculate the correlation
+  cor_temp <- cor.test(c(bigDF[bigDF$sizeClass == meshp_i, "VSS"], VSS.outSB, VSS.staySB, VSS.goCont, VSS.goSB), 
+                       c(bigDF[bigDF$sizeClass == meshp_i, "correctedSD"], corr.outSB.sd_min, corr.staySB.sd_min, corr.goCont.sd_min, corr.goSB.sd_min),
+                       method = "pearson")
+  
+  
+  # ggplot(data = bigDF[bigDF$sizeClass == meshp_i,]) +
+  #   geom_point(aes(x = VSS, y = correctedSD, col = VitalRate)) + 
+  #   geom_point(data = (data.frame("VitalRate" = c("outSB", "staySB", "goCont", "goSB"), 
+  #                                 "VSS" = c(VSS.outSB, VSS.staySB, VSS.goCont, VSS.goSB), 
+  #                                 "correctedSD" = c(corr.outSB.sd, corr.staySB.sd, corr.goCont.sd, corr.goSB.sd))), aes(x = VSS, y = correctedSD)) +
+  #   geom_smooth(aes(x = VSS, y = correctedSD), method = "lm", se = FALSE, col = "grey20") +
+  #   theme_minimal()
+  
+  # save the correlation
+  if (i == 1) {
+    correlations_min <- data.frame("sizeClass" = meshp_i, "correlation" = cor_temp$estimate, "corr_pVal" = cor_temp$p.value, "corr_confIntLow" = cor_temp$conf.int[1], "corr_confIntHigh" = cor_temp$conf.int[2])
+  } else {
+   correlations_min <-  rbind(correlations_min, data.frame("sizeClass" = meshp_i, "correlation" = cor_temp$estimate, "corr_pVal" = cor_temp$p.value, "corr_confIntLow" = cor_temp$conf.int[1], "corr_confIntHigh" = cor_temp$conf.int[2]))
+  }
+}
+```
+
+```{r}
+# visualize the correlation coefficients for each size class 
+ggplot(data = correlations_min) +
+  geom_ribbon(aes(ymin = corr_confIntLow, ymax = corr_confIntHigh, x = meshp), fill = "lightgrey", alpha = .5) +
+  geom_point(aes(x = sizeClass, y = correlation, col = corr_pVal)) + 
+  geom_point(data = correlations_min[correlations_min$corr_pVal <=.05,], aes(x = sizeClass, y = correlation), col = "red", pch = 1) +
+  theme_minimal() + 
+  xlab("Size Class (ln(cm))")
+```
+
+There is no significant negative correlation between vital rate VSS and corrected standard deviation in any size class (this assumes the minimum possible variation for sandbank parameters). There is, however, a significant positive correlation between VSS and corrected SD for size classes ~350 - 400 (significant correlations shown in red). 95% confidence intervals for the correlation estimate are shown in grey. 
