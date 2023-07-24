@@ -391,7 +391,7 @@ seedlingSize.mean <- apply(simplify2array(seedlingSize), 1, mean)
 #SeedlingSize.sd <-
     #apply(simplify2array(SeedlingSize), 1:2, sd) 
 seedlingSize.sd <- apply(simplify2array(seedlingSize), 1, sd)
-
+ 
 # corrected sd of SeedlingSize (use a logit transformation, since it is a probability)
 corr.seedlingSize.sd <-
   apply(car::logit(simplify2array(seedlingSize),adjust = .001), 1, sd)
@@ -402,18 +402,18 @@ corr.seedlingSize.sd <-
 First, simulate the maximum standard deviation for each sandbank vital rate 
 
 ```{r}
-corr.outSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
-corr.staySB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
-corr.goCont.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
-corr.goSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
+corr.outSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 100)))
+corr.staySB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 100)))
+corr.goCont.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 100)))
+corr.goSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 100)))
 ```
 
-Then, simulate the minimum standard deviatino for each sandbank vital rate 
+Then, simulate the minimum standard deviation for each sandbank vital rate 
 ```{r}
-corr.outSB.sd_min <- sd(car::logit(seq(from = outSB*.9, to = outSB*1.1, length.out = 20)))
-corr.staySB.sd_min <- sd(car::logit(seq(from = staySB*.9, to = staySB*1.1, length.out = 20)))
-corr.goCont.sd_min <- sd(car::logit(seq(from = goCont*.9, to = goCont*1.1, length.out = 20)))
-corr.goSB.sd_min <- sd(car::logit(seq(from = goSB*.9, to = goSB*1.1, length.out = 20)))
+corr.outSB.sd_min <- sd(car::logit(seq(from = (outSB-.01), to =( outSB+.01), length.out = 100)))
+corr.staySB.sd_min <- sd(car::logit(seq(from = (staySB-.01), to = (staySB+.01), length.out = 100)))
+corr.goCont.sd_min <- sd(car::logit(seq(from = (goCont-.01), to = (goCont+.01), length.out = 100)))
+corr.goSB.sd_min <- sd(car::logit(seq(from = (goSB-.01), to = (goSB+.01), length.out = 100)))
 ```
 
 ## Calculate Sensitivity 
@@ -1409,3 +1409,72 @@ ggplot(data = correlations_min) +
 ```
 
 There is no significant negative correlation between vital rate VSS and corrected standard deviation in any size class (this assumes the minimum possible variation for sandbank parameters). There is, however, a significant positive correlation between VSS and corrected SD for size classes ~350 - 400 (significant correlations shown in red). 95% confidence intervals for the correlation estimate are shown in grey. 
+
+## Compare mean of VSS and mean of SD across all vital rates
+
+Do the comparison using the minimumm simulated standard deviation for discrete seedbank parameters
+```{r}
+# calculate the mean of sd and mean of VSS for each vital rate
+bigDF_minSbSd <-  bigDF %>% 
+  group_by(VitalRate) %>% 
+  summarize(mean_VSS = mean(VSS),
+            sd_VSS = sd(VSS), 
+            mean_corrSD = mean(correctedSD), 
+            sd_corrSD = sd(correctedSD)) %>% 
+  rbind(c("outSB", VSS.outSB, NA, corr.outSB.sd_min, NA)) %>% 
+  rbind(c("staySB", VSS.staySB, NA, corr.staySB.sd_min, NA)) %>% 
+  rbind(c("goCont" , VSS.goCont, NA, corr.goCont.sd_min, NA)) %>% 
+  rbind(c("goSB", VSS.goSB, NA, corr.goSB.sd_min,  NA)) %>% 
+  mutate(across(!VitalRate, as.numeric))
+  
+
+  
+cor_minSbSd <- cor.test(bigDF_minSbSd$mean_VSS, bigDF_minSbSd$mean_corrSD)
+# correlation: cor = .83, P-value = .006
+ggplot(bigDF_minSbSd) +
+   geom_smooth(aes(y = mean_corrSD, x = mean_VSS), method = "lm", col = "darkgrey", se = FALSE) +
+  #geom_point(aes(x = mean_VSS, y = mean_corrSD)) + 
+  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, xmin = (mean_VSS - sd_VSS), xmax = (mean_VSS + sd_VSS))) +
+  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, ymin = mean_corrSD - sd_corrSD, ymax = mean_corrSD + sd_corrSD)) + 
+  xlab("meanVSS") +
+  ylab("mean corrected SD") + 
+  geom_text(aes(x = 1.5, y = 2.5, label = paste0("corr=", round(cor_minSbSd$estimate, 2),"; P-val=", round(cor_minSbSd$p.value, 3)))) +
+  theme_classic()
+
+```
+
+
+Do the comparison using the maximum simulated standard deviation for discrete seedbank parameters
+```{r}
+# calculate the mean of sd and mean of VSS for each vital rate
+bigDF_maxSbSd <-  bigDF %>% 
+  group_by(VitalRate) %>% 
+  summarize(mean_VSS = mean(VSS),
+            sd_VSS = sd(VSS), 
+            mean_corrSD = mean(correctedSD), 
+            sd_corrSD = sd(correctedSD)) %>% 
+  rbind(c("outSB", VSS.outSB, NA, corr.outSB.sd, NA)) %>% 
+  rbind(c("staySB", VSS.staySB, NA, corr.staySB.sd, NA)) %>% 
+  rbind(c("goCont" , VSS.goCont, NA, corr.goCont.sd, NA)) %>% 
+  rbind(c("goSB", VSS.goSB, NA, corr.goSB.sd, NA)) %>% 
+  mutate(across(!VitalRate, as.numeric))
+  
+ggplot(bigDF_maxSbSd) +
+   geom_smooth(aes(y = mean_corrSD, x = mean_VSS), method = "lm", col = "darkgrey", se = FALSE) +
+  #geom_point(aes(x = mean_VSS, y = mean_corrSD)) + 
+  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, xmin = (mean_VSS - sd_VSS), xmax = (mean_VSS + sd_VSS))) +
+  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, ymin = mean_corrSD - sd_corrSD, ymax = mean_corrSD + sd_corrSD)) + 
+  xlab("meanVSS") +
+  ylab("mean corrected SD") + 
+  geom_text(aes(x = 1.5, y = 2.5, label = paste0("corr=", round(cor_maxSbSd$estimate, 2),"; P-val=", round(cor_maxSbSd$p.value, 3)))) +
+  theme_classic()
+  
+  
+cor_maxSbSd <- cor.test(bigDF_maxSbSd$mean_VSS, bigDF_maxSbSd$mean_corrSD)
+# correlation: cor = .83, P-value = .006
+plot(bigDF_maxSbSd$mean_VSS, bigDF_maxSbSd$mean_corrSD, pch = 16,
+     xlab = c("mean VSS"), ylab = c("mean corrected SD"))
+abline(lm( bigDF_maxSbSd$mean_corrSD ~ bigDF_maxSbSd$mean_VSS))
+text(x = .4, y = .5, labels = paste0("corr=", round(cor_maxSbSd$estimate, 2),"; P-val=", round(cor_maxSbSd$p.value, 2)))
+```
+
