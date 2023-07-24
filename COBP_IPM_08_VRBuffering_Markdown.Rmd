@@ -1436,7 +1436,9 @@ bigDF_minSbSd <-  bigDF %>%
   rbind(c("staySB", VSS.staySB, NA, corr.staySB.sd_min, NA)) %>% 
   rbind(c("goCont" , VSS.goCont, NA, corr.goCont.sd_min, NA)) %>% 
   rbind(c("goSB", VSS.goSB, NA, corr.goSB.sd_min,  NA)) %>% 
-  mutate(across(!VitalRate, as.numeric))
+  rbind(c("growth", mean(VSS.growth), sd(VSS.growth), mean(corr.growth.sd), sd(corr.growth.sd))) %>%
+  rbind(c("seedlingSize", mean(VSS.SeedlingSize), sd(VSS.SeedlingSize), mean(corr.seedlingSize.sd), sd(corr.seedlingSize.sd))) %>% 
+  mutate(across(!VitalRate, as.numeric)) 
   
 
   
@@ -1445,12 +1447,13 @@ cor_minSbSd <- cor.test(bigDF_minSbSd$mean_VSS, bigDF_minSbSd$mean_corrSD)
 ggplot(bigDF_minSbSd) +
    geom_smooth(aes(y = mean_corrSD, x = mean_VSS), method = "lm", col = "darkgrey", se = FALSE) +
   #geom_point(aes(x = mean_VSS, y = mean_corrSD)) + 
-  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, xmin = (mean_VSS - sd_VSS), xmax = (mean_VSS + sd_VSS))) +
-  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, ymin = mean_corrSD - sd_corrSD, ymax = mean_corrSD + sd_corrSD)) + 
-  xlab("meanVSS") +
+  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, xmin = (mean_VSS - sd_VSS), xmax = (mean_VSS + sd_VSS), col = VitalRate)) +
+  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, ymin = mean_corrSD - sd_corrSD, ymax = mean_corrSD + sd_corrSD, col = VitalRate)) + 
+  xlab("mean VSS") +
   ylab("mean corrected SD") + 
-  geom_text(aes(x = 1.5, y = 2.5, label = paste0("corr=", round(cor_minSbSd$estimate, 2),"; P-val=", round(cor_minSbSd$p.value, 3)))) +
-  theme_classic()
+  geom_text(aes(x = 1, y = 2.5, label = paste0("corr=", round(cor_minSbSd$estimate, 2),"; P-val=", round(cor_minSbSd$p.value, 3)))) +
+  theme_classic() +
+  labs(title = "Correlation between Mean VSS and mean corrected SD for each vital rate \n with *minimum* variation in discrete seedbank vital rates")
 
 ```
 
@@ -1468,24 +1471,23 @@ bigDF_maxSbSd <-  bigDF %>%
   rbind(c("staySB", VSS.staySB, NA, corr.staySB.sd, NA)) %>% 
   rbind(c("goCont" , VSS.goCont, NA, corr.goCont.sd, NA)) %>% 
   rbind(c("goSB", VSS.goSB, NA, corr.goSB.sd, NA)) %>% 
-  mutate(across(!VitalRate, as.numeric))
+  rbind(c("growth", mean(VSS.growth), sd(VSS.growth), mean(corr.growth.sd), sd(corr.growth.sd))) %>%
+  rbind(c("seedlingSize", mean(VSS.SeedlingSize), sd(VSS.SeedlingSize), mean(corr.seedlingSize.sd), sd(corr.seedlingSize.sd))) %>% 
+  mutate(across(!VitalRate, as.numeric)) 
+
+# add the information for growth (which is a matrix)
   
 ggplot(bigDF_maxSbSd) +
    geom_smooth(aes(y = mean_corrSD, x = mean_VSS), method = "lm", col = "darkgrey", se = FALSE) +
   #geom_point(aes(x = mean_VSS, y = mean_corrSD)) + 
-  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, xmin = (mean_VSS - sd_VSS), xmax = (mean_VSS + sd_VSS))) +
-  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, ymin = mean_corrSD - sd_corrSD, ymax = mean_corrSD + sd_corrSD)) + 
-  xlab("meanVSS") +
+  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, xmin = (mean_VSS - sd_VSS), xmax = (mean_VSS + sd_VSS), col = VitalRate)) +
+  geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, ymin = mean_corrSD - sd_corrSD, ymax = mean_corrSD + sd_corrSD, col = VitalRate)) + 
+  xlab("mean VSS") +
   ylab("mean corrected SD") + 
-  geom_text(aes(x = 1.5, y = 2.5, label = paste0("corr=", round(cor_maxSbSd$estimate, 2),"; P-val=", round(cor_maxSbSd$p.value, 3)))) +
-  theme_classic()
+  geom_text(aes(x = 1, y = 2.5, label = paste0("corr=", round(cor_maxSbSd$estimate, 2),"; P-val=", round(cor_maxSbSd$p.value, 3)))) +
+  theme_classic() +
+  labs(title = "Correlation between Mean VSS and mean corrected SD for each vital rate \n with *maximum* variation in discrete seedbank vital rates")
+
   
-  
-cor_maxSbSd <- cor.test(bigDF_maxSbSd$mean_VSS, bigDF_maxSbSd$mean_corrSD)
-# correlation: cor = .83, P-value = .006
-plot(bigDF_maxSbSd$mean_VSS, bigDF_maxSbSd$mean_corrSD, pch = 16,
-     xlab = c("mean VSS"), ylab = c("mean corrected SD"))
-abline(lm( bigDF_maxSbSd$mean_corrSD ~ bigDF_maxSbSd$mean_VSS))
-text(x = .4, y = .5, labels = paste0("corr=", round(cor_maxSbSd$estimate, 2),"; P-val=", round(cor_maxSbSd$p.value, 2)))
 ```
 
