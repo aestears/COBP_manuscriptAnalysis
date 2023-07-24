@@ -340,29 +340,30 @@ GR.fun <- function(z, zz, paramCont) {
   return(dnorm(zz, mean = growth.mu, 
                sd =  paramCont$g_sd))
 } 
+
 # calculate the growth matrix based on model parameters for each IPM
 growth <-
   lapply(allIPMs,
     FUN = function(x)
-      h * GR.fun(z = meshp, zz = meshp, paramCont = x$params)
-      #h * t(outer(meshp, meshp, GR.fun, paramCont = x$params) ## don't multiply by h (integrate)...should I???
-            #)
+      #h * GR.fun(z = meshp, zz = meshp, paramCont = x$params)
+      h * t(outer(meshp, meshp, GR.fun, paramCont = x$params) ## don't multiply by h (integrate)...should I???
+            )
     ) 
 # 'growth' is a list in which each element contains the growth matrix for one subpop/year
     
 #Calculate the mean of growth 
-#growth.mean <-
-    #apply(simplify2array(growth), 1:2, mean) 
-growth.mean <- apply(simplify2array(growth), 1, mean)
+growth.mean <-
+    apply(simplify2array(growth), 1:2, mean) 
+#growth.mean <- apply(simplify2array(growth), 1, mean)
 
-# sd of growth 
-#growth.sd <-
-    #apply(simplify2array(growth), 1:2, sd) 
-growth.sd <- apply(simplify2array(growth), 1, sd)
+# sd of growth
+growth.sd <-
+  apply(simplify2array(growth), 1:2, sd) 
+#growth.sd <- apply(simplify2array(growth), 1, sd)
 
 # corrected sd of growth (use a logit transformation, since it is a probability)
 corr.growth.sd <-
-  apply(car::logit(simplify2array(growth),adjust = .001), 1, sd)
+  apply(car::logit(simplify2array(growth),adjust = .001), 1:2, sd)
 ```
 
 #### seedling size distribution $c_0(z)$
@@ -378,19 +379,20 @@ Use the seedling size distribution function w/ parameters for each IPM to calcul
 seedlingSize <-
   lapply(allIPMs,
     FUN = function(x)
-      h * SDS.fun(zz = meshp, paramCont = x$params) 
-    ) 
+      #h * SDS.fun(zz = meshp, paramCont = x$params) 
+    h * matrix(rep(SDS.fun(meshp, x$params),n),n,n,byrow=F)
+      ) 
 # 'seedling size' is a list in which each element contains the growth matrix for one subpop/year
     
 #Calculate the mean of seedling size
-#growth.mean <-
-    #apply(simplify2array(growth), 1:2, mean) 
-seedlingSize.mean <- apply(simplify2array(seedlingSize), 1, mean)
+seedlingSize.mean <-
+    apply(simplify2array(seedlingSize), 1:2, mean) 
+#seedlingSize.mean <- apply(simplify2array(seedlingSize), 1, mean)
 
 # sd of SeedlingSize 
-#SeedlingSize.sd <-
-    #apply(simplify2array(SeedlingSize), 1:2, sd) 
-seedlingSize.sd <- apply(simplify2array(seedlingSize), 1, sd)
+seedlingSize.sd <-
+    apply(simplify2array(seedlingSize), 1:2, sd) 
+#seedlingSize.sd <- apply(simplify2array(seedlingSize), 1, sd)
  
 # corrected sd of SeedlingSize (use a logit transformation, since it is a probability)
 corr.seedlingSize.sd <-
@@ -509,10 +511,13 @@ h=(U-L)/n # bin width
 surv_OG <- S.fun(meshp, paramCont)
   
 # growth
-growth_OG <- h * GR.fun(z = meshp, zz = meshp, paramCont = paramCont) # don't multiply by h... so no integration? is this correct?
+growth_OG <- #h * GR.fun(z = meshp, zz = meshp, paramCont = paramCont) # don't multiply by h... so no integration? is this correct?
+  h * t(outer(meshp,meshp,GR.fun, paramCont))
 
 # seedling size distribution
-seedlingSize_OG <-  h * SDS.fun(zz = meshp, paramCont = paramCont)
+seedlingSize_OG <-  #h * SDS.fun(zz = meshp, paramCont = paramCont)
+  h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
+
 # probability of flowering
 flowering_OG <- (FL.fun(meshp, paramCont))
 
@@ -818,8 +823,8 @@ perturbVal <- .01
 ## redefine the growth probability function to add a tiny value 
   # GROWTH (we assume a constant variance)
 GR.fun_pert <- function(z,zz, paramCont){
-  growth.mu = paramCont[["growth"]]["(Intercept)",1] + paramCont[["growth"]]["log_LL_t",1]*z + perturbVal
-  return(dnorm(zz, mean = growth.mu, sd = paramCont[["growth"]][1,2]))
+  growth.mu = paramCont[["growth"]]["(Intercept)",1] + paramCont[["growth"]]["log_LL_t",1]*z 
+  return(dnorm(zz, mean = growth.mu, sd = paramCont[["growth"]][1,2]) + perturbVal)
 }
 
 # Survival and growth 
@@ -867,7 +872,7 @@ eigenMat <- eigen(ipm_perturb_Growth)
 # get and save the perturbed lambda
 lambda_perturb_Growth <-eigenMat$values[1]
 # get and save the perturbed vital rate function
-G_perturb <- h * GR.fun_pert(z = meshp, zz = meshp, paramCont = paramCont )
+G_perturb <- h * t(outer(meshp,meshp,GR.fun_pert, paramCont))
 ```
 
 Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
@@ -893,10 +898,10 @@ where $\frac{\delta\lambda}{\delta G(z',z)}$ is the sensitivity calculated above
 # version for non-probability vital rate
 # VSS.growth <- sens_Growth * (growth_OG/as.numeric(lambda_OG))
 # version for probability vital rate
-VSS.growth <- as.numeric(sens_Growth * ((growth.mean*(1-growth.mean))/lambda_OG))
+VSS.growth <- as.numeric(sens_Growth) * ((growth.mean*(1-growth.mean))/ as.numeric(lambda_OG))
 
-plot(VSS.growth, type = "l")
-lines(sens_Growth, lty = 2)
+#plot(VSS.growth, type = "l")
+#lines(sens_Growth, lty = 2)
 ```
 
 #### Sensitivity to seedling recruit size
@@ -915,9 +920,9 @@ perturbVal <- .01
 ## redefine the recruit size probability distribution 
 ## SEEDLING SIZES (same approach as in growth function)
 SDS.fun_pert <- function(zz, paramCont){
-  rec_mu <- paramCont[["recruitDist"]][1] + perturbVal
+  rec_mu <- paramCont[["recruitDist"]][1] 
   rec_sd <- paramCont[["recruitDist"]][2]
-  return(dnorm(zz, mean = rec_mu, sd = rec_sd))
+  return(dnorm(zz, mean = rec_mu, sd = rec_sd)+ perturbVal)
 }
 
 # Survival and growth 
@@ -984,7 +989,7 @@ VSS for $s(z)$ = $$\frac{c_0(z)(1-c_0(z))}{\lambda} \frac{\delta\lambda}{\delta 
 where $\frac{\delta\lambda}{\delta c_0(z)}$ is the sensitivity calculated above
 ```{r}
 # VSS on SeedlingSize 
-VSS.SeedlingSize <- as.numeric(sens_SeedlingSize * ((seedlingSize.mean*(1-seedlingSize.mean))/lambda_OG))
+VSS.SeedlingSize <- as.numeric(sens_SeedlingSize) * ((seedlingSize.mean*(1-seedlingSize.mean))/as.numeric(lambda_OG))
 
 plot(VSS.SeedlingSize, type = "l")
 lines(sens_SeedlingSize, lty = 2)
@@ -1325,10 +1330,14 @@ Support for DBH: a negative correlation between vital rate importance (VSS) and 
 ```{r}
 
 # put all the vital rates into one data.frame
-bigDF <- data.frame("VitalRate" = c(rep("surv", 500), rep("seedProd", 500), rep("flowerProb", 500), rep("growth", 500), rep("seedlingSize", 500)),
-                    "sizeClass" = rep(meshp, times = 5),
-                    "VSS" = c(VSS.surv, VSS.seeds, VSS.flwr, VSS.growth, VSS.SeedlingSize), 
-                    "correctedSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd, corr.growth.sd, corr.seedlingSize.sd)
+bigDF <- data.frame("VitalRate" = c(rep("surv", 500), rep("seedProd", 500), rep("flowerProb", 500)#, #rep("growth", 500), 
+                                    #rep("seedlingSize", 500)
+                                    ),
+                    "sizeClass" = rep(meshp, times = 3),#5),
+                    "VSS" = c(VSS.surv, VSS.seeds, VSS.flwr#, #SS.growth,  VSS.SeedlingSize
+                              ), 
+                    "correctedSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd#, #corr.growth.sd, corr.seedlingSize.sd
+                                      )
                     )
 
 for (i in 1:500) {
@@ -1362,6 +1371,7 @@ ggplot(data = correlations) +
   geom_ribbon(aes(ymin = corr_confIntLow, ymax = corr_confIntHigh, x = meshp), fill = "lightgrey", alpha = .5) +
   geom_point(aes(x = sizeClass, y = correlation, col = corr_pVal)) + 
   geom_point(data = correlations[correlations$corr_pVal <=.05,], aes(x = sizeClass, y = correlation), pch = 5) +
+  geom_hline(aes(yintercept = 0), col = "darkgrey") +
   theme_minimal()+ 
   xlab("Size Class (ln(cm))")
 ```
@@ -1404,6 +1414,7 @@ ggplot(data = correlations_min) +
   geom_ribbon(aes(ymin = corr_confIntLow, ymax = corr_confIntHigh, x = meshp), fill = "lightgrey", alpha = .5) +
   geom_point(aes(x = sizeClass, y = correlation, col = corr_pVal)) + 
   geom_point(data = correlations_min[correlations_min$corr_pVal <=.05,], aes(x = sizeClass, y = correlation), col = "red", pch = 1) +
+  geom_hline(aes(yintercept = 0), col = "darkgrey") +
   theme_minimal() + 
   xlab("Size Class (ln(cm))")
 ```
