@@ -12,6 +12,7 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(popbio)
+library(ggpubr)
 ```
 
 ## IPM Equations
@@ -1449,7 +1450,7 @@ bigDF_minSbSd <-  bigDF %>%
 cor_minSbSd <- cor.test(bigDF_minSbSd$mean_VSS, bigDF_minSbSd$mean_corrSD)
 
 # correlation: cor = .83, P-value = .006
-ggplot(bigDF_minSbSd) +
+minSD_fig <- ggplot(bigDF_minSbSd) +
    geom_smooth(aes(y = mean_corrSD, x = mean_VSS), method = "lm", col = "grey30", se = FALSE, fullrange = TRUE, lty = 2) +
   #geom_point(aes(x = mean_VSS, y = mean_corrSD)) + 
   geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, 
@@ -1465,7 +1466,7 @@ ggplot(bigDF_minSbSd) +
   xlab("mean VSS") +
   ylab("mean corrected SD") + 
   geom_label(aes(x = 1.5, y = -1, 
-                label = paste0("corr. = ", round(cor_minSbSd$estimate, 2),"; P-val = ", round(cor_minSbSd$p.value, 3))),
+                label = paste0("r = ", round(cor_minSbSd$estimate, 2),"; P-val = ", round(cor_minSbSd$p.value, 3))),
              label.size = NA) +
   theme_classic() +
   scale_colour_manual(values = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00","#f3d210","#A65628", "#F781BF", "#7a7a7a"), name = "Vital Rate", labels = c("Flowering (Pb(z))", "goCont", "goSB", "Growth (G(z',z))", "outSB","Recruit size (c\u2092(z'))", "Seed prod. (b(z))", "staySB", "Survival (s(z))")) + 
@@ -1497,7 +1498,7 @@ bigDF_maxSbSd <-  bigDF %>%
 # calculate the correlation  
 cor_maxSbSd <- cor.test(bigDF_maxSbSd$mean_VSS, bigDF_maxSbSd$mean_corrSD)
   
-ggplot(bigDF_maxSbSd) +
+maxSD_fig <- ggplot(bigDF_maxSbSd) +
    geom_smooth(aes(y = mean_corrSD, x = mean_VSS), method = "lm", col = "grey30", se = FALSE, fullrange = TRUE, lty = 2) +
   #geom_point(aes(x = mean_VSS, y = mean_corrSD)) + 
   geom_pointrange(aes(x = mean_VSS, y = mean_corrSD, 
@@ -1512,11 +1513,18 @@ ggplot(bigDF_maxSbSd) +
                       pch = VitalRateType)) + 
   xlab("mean VSS") +
   ylab("mean corrected SD") + 
-  geom_label(aes(x = 1.5, y = -.8, label = paste0("corr. = ", round(cor_maxSbSd$estimate, 2),"; P-val = ", round(cor_maxSbSd$p.value, 3))),
+  geom_label(aes(x = 1.5, y = -.8, label = paste0("r = ", round(cor_maxSbSd$estimate, 2),"; P-val = ", round(cor_maxSbSd$p.value, 3))),
              label.size = NA) +
   theme_classic() +
   scale_colour_manual(values = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00","#f3d210","#A65628", "#F781BF", "#7a7a7a"), name = "Vital Rate", labels = c("Flowering (Pb(z))", "goCont", "goSB", "Growth (G(z',z))", "outSB","Recruit size (c\u2092(z'))", "Seed prod. (b(z))", "staySB", "Survival (s(z))")) + 
   scale_shape_manual(values = c(16,17), name = "Vital Rate Type")#+
   #labs(title = "Correlation between Mean VSS and mean corrected SD for each vital rate \n with *maximum* variation in discrete seedbank vital rates")
+```
+
+Combine figures into one
+```{r}
+VRbuff_fig <- ggpubr::ggarrange(minSD_fig, maxSD_fig, ncol = 1, common.legend = TRUE, legend = "right", labels = c("A", "B"))
+# save file
+ggsave(filename = "../figures/VRbufferingFigure.pdf", plot = VRbuff_fig, device = "pdf")
 ```
 
