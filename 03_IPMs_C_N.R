@@ -5,7 +5,7 @@
 #/////////////////////////
 
 #### load vital rate models from previous script ####
-source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
+source("./analysis_scripts/01_VitalRateModels.R")
 
 #### IPMs C - H ####
 ### DI IPM for each site, discrete, all transitions ###
@@ -14,7 +14,7 @@ source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
 L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
 U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
 
-n <-200 # bins
+n <-500 # bins
 
 # These are the parameters for the discrete stages
 outSB <- outSB_all #SB to continuous stage
@@ -349,7 +349,7 @@ IPMs_C_H_bootCIs[[i]] <- list("params" = param_fig, "lambdas" = IPMs_C_H_bootCI_
 L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
 U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
 
-n <-150 # bins
+n <-500 # bins
 
 # These are the parameters for the discrete stages
 # I usually only have seed banks (SB), but now I added a seedling stage
@@ -442,14 +442,14 @@ for (i in 1:length(unique(dat_all$Site))) {
   h=(U-L)/n # bin width 
   
   # Survival and growth 
-  S <- diag(S.fun(meshp, N_all = 150)) # Survival # put survival probabilities in the diagonal of the matrix
-  G <- h * t(outer(meshp,meshp,GR.fun, N_all = 150)) # Growth
+  S <- diag(S.fun(meshp, N_all = 100)) # Survival # put survival probabilities in the diagonal of the matrix
+  G <- h * t(outer(meshp,meshp,GR.fun, N_all = 100)) # Growth
   
   #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
   c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
   
   #Probability of flowering
-  Pb = (FL.fun(meshp, N_all = 150))
+  Pb = (FL.fun(meshp, N_all = 100))
   
   #Number of seeds produced according to adult size
   b_seed = (SDP.fun(meshp))
@@ -592,14 +592,14 @@ for (i in 1:length(unique(dat_all$Site))) {
     h=(U-L)/n # bin width 
     
     # Survival and growth 
-    S <- diag(S.fun(meshp, N_all = 150)) # Survival # put survival probabilities in the diagonal of the matrix
-    G <- h * t(outer(meshp,meshp,GR.fun, N_all = 150)) # Growth
+    S <- diag(S.fun(meshp, N_all = 100)) # Survival # put survival probabilities in the diagonal of the matrix
+    G <- h * t(outer(meshp,meshp,GR.fun, N_all = 100)) # Growth
     
     #Recruits distribution (seeds recruited from the seedbank into the continuous stage)
     c_o <- h * matrix(rep(SDS.fun(meshp),n),n,n,byrow=F)
     
     #Probability of flowering
-    Pb = (FL.fun(meshp, N_all = 150))
+    Pb = (FL.fun(meshp, N_all = 100))
     
     #Number of seeds produced according to adult size
     b_seed = (SDP.fun(meshp))
@@ -681,7 +681,7 @@ for (i in 1:length(unique(dat_all$Site))) {
   IPMs_I_N_bootCIs[[i]] <- list("params" = param_fig, "lambdas" = IPMs_I_N_bootCI_lambdas)
 }
 #### save the data to file ####
-fileLoc <- "./intermediate_analysis_Data/site_level_IPMs_allYears/"
+fileLoc <- "./intermediate_analysis_Data/"
 ## site-level DI IPM matrices
 saveRDS(IPMs_C_H, file = paste0(fileLoc,"/IPMs_C_H.RDS"))
 ## site-level DI bootstrap CI data
@@ -693,3 +693,4 @@ saveRDS(IPMs_I_N, file = paste0(fileLoc,"/IPMs_I_N.RDS"))
 ## site-level DD bootstrap CI data
 saveRDS(IPMs_I_N_bootCI_lambdas, file = paste0(fileLoc, "/IPMs_I_N_bootCI_lambdas.RDS"))
 saveRDS(IPMs_I_N_bootCI_params, file = paste0(fileLoc, "/IPMs_I_N_bootCI_params.RDS"))
+

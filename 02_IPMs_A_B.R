@@ -640,4 +640,4 @@ mean <- mean(allDI_lambdas)
 allDI_CI <- c((mean - 1.96*SE),(mean + 1.96*SE))
 
 #### store the ipm results
-save.image(file = "./intermediate_analysis_Data/allSiteAllYears_noDDnoEnv/ipmA_B_results.RData")
+save.image(file = "./intermediate_analysis_Data/ipmA_B_results.RData")

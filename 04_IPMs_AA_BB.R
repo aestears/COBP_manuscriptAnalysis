@@ -4,7 +4,7 @@
 # 08 December 2021
 #/////////////////////////
 #### load vital rate models from previous script ####
-source("./analysis_scripts/COBP_IPM_02_VitalRateModels.R")
+source("./analysis_scripts/01_VitalRateModels.R")
 
 #### vital rate functions #### 
 ## same for both models 
@@ -88,7 +88,7 @@ paramsSoap <- list(
 # Define the lower and upper integration limit
 L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
 U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
-n <-200 # bins
+n <-500 # bins
 K <- array(0,c(n+1,n+1))
 # Setting up the kernels
 K <- array(0,c(n+1,n+1))
@@ -125,7 +125,7 @@ Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
 Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 mat_IPM_AA <-Pkernel+Fkernel
 lam_IPM_AA <- eigen(mat_IPM_AA)$values[1]
-
+IPM_AA <- mat_IPM_AA
 ## bootstrap 95% CI
 IPM_AA_bootCI_lambdas <- numeric(1000L)
 # make a list to hold the model parameters
@@ -279,7 +279,7 @@ paramsBase<- list(
 # Define the lower and upper integration limit
 L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
 U <-  1.2 * max(dat_all$log_LL_t, na.rm = TRUE) # maximum size
-n <-200 # bins
+n <-500 # bins
 K <- array(0,c(n+1,n+1))
 
 # Setting up the kernels
@@ -313,6 +313,7 @@ Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 
 mat_IPM_BB <-Pkernel+Fkernel
 lam_IPM_BB <- eigen(mat_IPM_BB)$values[1]
+IPM_BB <- mat_IPM_BB
 
 ## bootstrap 95% CI
 IPM_BB_bootCI_lambdas <- numeric(1000L)
@@ -423,3 +424,20 @@ for(i in 1:1000) {
 SE <- sd(IPM_BB_bootCI_lambdas)/sqrt(1000)
 mean <- mean(IPM_BB_bootCI_lambdas)
 baseDI_CI <- c((mean - 1.96*SE),(mean + 1.96*SE))
+
+
+#### save the data to file ####
+fileLoc <- "./intermediate_analysis_Data/"
+## site-level DI IPM matrices
+saveRDS(IPM_AA, file = paste0(fileLoc,"/IPM_AA.RDS"))
+## site-level DI bootstrap CI data
+saveRDS(IPM_AA_bootCI_lambdas, file = paste0(fileLoc,"/IPM_AA_bootCI_lambdas.RDS"))
+saveRDS(IPM_AA_bootCI_params, file = paste0(fileLoc,"/IPM_AA_bootCI_params.RDS"))
+
+## site-level DD IPM matrices
+saveRDS(IPM_BB, file = paste0(fileLoc,"/IPMs_BB.RDS"))
+## site-level DD bootstrap CI data
+saveRDS(IPM_BB_bootCI_lambdas, file = paste0(fileLoc, "/IPMs_BB_bootCI_lambdas.RDS"))
+saveRDS(IPM_BB_bootCI_params, file = paste0(fileLoc, "/IPMs_BB_bootCI_params.RDS"))
+
+
