@@ -39,8 +39,7 @@ library(tidyverse)
 library(sf)
 
 # load dataset
-setwd("../Raw Data/")
-counts<- read.csv("./COBP_data_10_25_20.csv", stringsAsFactors = FALSE) #will have to update file name as it changes w/ most current version
+counts<- read.csv("../Raw Data/COBP_data_10_25_20.csv", stringsAsFactors = FALSE) #will have to update file name as it changes w/ most current version
 sites <- read.csv("../Raw Data/COBP Plot Locations.csv", stringsAsFactors = FALSE)
 
 #### get spatial plot locations ####
