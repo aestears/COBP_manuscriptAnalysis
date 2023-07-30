@@ -161,14 +161,18 @@ staySB <- staySB_all # staying in SB
 goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
 goSB <- goSB_all # seeds go to the seedbank
 surv.seeds <-  0.9 # survival of seeds
+
+IPMs_C_H_bootCI_lambdas <- vector(mode = "list", length = 6)
+
+IPMs_C_H_bootCI_params <- vector(mode = "list", length = 6)
+
 for (i in 1:length(unique(dat_all$Site))) {
   # get the data just for this site
   dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i],]
   # make a vector to hold all of the lambdas from the resampling runs
-  IPMs_C_H_bootCI_lambdas <- numeric(1000L)
+  current_i_lambdas <- numeric(1000L)
   # make a list to hold the model parameters (output)
-  IPMs_C_H_bootCI_params <- list()
-  
+  current_i_params <- vector(mode = "list", length = 1000)
   # Now, we refit the vital rate models, and refit the IPM
   for(j in 1:1000) {
     ## sample continuous data
@@ -294,53 +298,30 @@ for (i in 1:length(unique(dat_all$Site))) {
     mat <-Pkernel+Fkernel
     
     # save the lambda
-    IPMs_C_H_bootCI_lambdas[j] <-base::eigen(mat)$values[1]
+    current_i_lambdas[j] <- base::eigen(mat)$values[1]
     # save the parameters
-    IPMs_C_H_bootCI_params[[j]] <- paramCont
+    current_i_params[[j]] <- paramCont
   }
   
-  ### plot the values
-  # get the parameters out
-  # Plot the results
-  param_fig <- data.frame("param" = "g_int", 
-                          "value" = sapply(X = IPMs_C_H_bootCI_params, FUN = function (x) x[[1]]))
-  param_fig <- rbind(param_fig,  data.frame("param" = "g_slope", 
-                                            "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                             FUN = function (x) x[[2]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "g_sd", 
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[3]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "s_int", 
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[4]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "s_slope",
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[5]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "p_b_int", 
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[6]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "p_b_slope", 
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[7]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "p_b_slope_2", 
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[8]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "b_int", 
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[9]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "b_slope", 
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[10]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "c_o_mu", 
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[11]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "c_o_sd", 
-                                           "value" = sapply(X = IPMs_C_H_bootCI_params,
-                                                            FUN = function (x) x[[12]])))
   
   # save the parameters in 'param_fig' format, as well as lambdas
-IPMs_C_H_bootCIs[[i]] <- list("params" = param_fig, "lambdas" = IPMs_C_H_bootCI_lambdas)
+  IPMs_C_H_bootCI_lambdas[[i]] <- current_i_lambdas
+  
+  IPMs_C_H_bootCI_params[[i]] <- current_i_params
+
 }
+
+IPMs_C_H_bootCI <- lapply(IPMs_C_H_bootCI_lambdas,
+                            FUN = function(x)
+                              c(log(c((mean(x[1:1000], na.rm = TRUE) - 1.96*sd(x[1:1000], na.rm = TRUE)/sqrt(100)),
+                                      (mean(x[1:1000], na.rm = TRUE) + 1.96*sd(x[1:1000], na.rm = TRUE)/sqrt(100)))),
+                                "n" = sum(!is.na(x)))
+)
+IPMs_C_H_bootCI <- lapply(IPMs_C_H_bootCI, 
+                            FUN = as.numeric)
+
+names(IPMs_C_H_bootCI) <- unique(dat_all$Site)
+
 
 ####IPMs I - N ####
 ### DD IPM for each site, discrete, all transitions ###
@@ -499,13 +480,18 @@ staySB <- staySB_all # staying in SB
 goCont <- goCont_all # seeds become continuous right away (without going to the seed bank) 
 goSB <- goSB_all # seeds go to the seedbank
 surv.seeds <-  0.9 # survival of seeds
+
+IPMs_I_N_bootCI_lambdas <- vector(mode = "list", length = 6)
+
+IPMs_I_N_bootCI_params <- vector(mode = "list", length = 6)
+
 for (i in 1:length(unique(dat_all$Site))) {
   # get the data just for this site
   dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i],]
   # make a vector to hold all of the lambdas from the resampling runs
-  IPMs_I_N_bootCI_lambdas <- numeric(1000L)
+  current_i_lambdas <- numeric(1000L)
   # make a list to hold the model parameters (output)
-  IPMs_I_N_bootCI_params <- list()
+  current_i_params <- vector(mode = "list", length = 1000)
   
   # Now, we refit the vital rate models, and refit the IPM
   for(j in 1:1000) {
@@ -632,54 +618,33 @@ for (i in 1:length(unique(dat_all$Site))) {
     
     mat <-Pkernel+Fkernel
     
+    
     # save the lambda
-    IPMs_I_N_bootCI_lambdas[j] <-base::eigen(mat)$values[1]
+    current_i_lambdas[j] <- base::eigen(mat)$values[1]
     # save the parameters
-    IPMs_I_N_bootCI_params[[j]] <- paramCont
+    current_i_params[[j]] <- paramCont
   }
   
-  ### plot the values
-  # get the parameters out
-  # Plot the results
-  param_fig <- data.frame("param" = "g_int", 
-                          "value" = sapply(X = IPMs_I_N_bootCI_params, FUN = function (x) x[[1]]))
-  param_fig <- rbind(param_fig,  data.frame("param" = "g_slope", 
-                                            "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                             FUN = function (x) x[[2]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "g_sd", 
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[3]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "s_int", 
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[4]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "s_slope",
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[5]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "p_b_int", 
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[6]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "p_b_slope", 
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[7]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "p_b_slope_2", 
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[8]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "b_int", 
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[9]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "b_slope", 
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[10]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "c_o_mu", 
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[11]])))
-  param_fig <- rbind(param_fig, data.frame("param" = "c_o_sd", 
-                                           "value" = sapply(X = IPMs_I_N_bootCI_params,
-                                                            FUN = function (x) x[[12]])))
   
   # save the parameters in 'param_fig' format, as well as lambdas
-  IPMs_I_N_bootCIs[[i]] <- list("params" = param_fig, "lambdas" = IPMs_I_N_bootCI_lambdas)
+  IPMs_I_N_bootCI_lambdas[[i]] <- current_i_lambdas
+  
+  IPMs_I_N_bootCI_params[[i]] <- current_i_params
+  
 }
+
+IPMs_I_N_bootCI <- lapply(IPMs_I_N_bootCI_lambdas,
+                          FUN = function(x)
+                            c(log(c((mean(x[1:1000], na.rm = TRUE) - 1.96*sd(x[1:1000], na.rm = TRUE)/sqrt(100)),
+                                    (mean(x[1:1000], na.rm = TRUE) + 1.96*sd(x[1:1000], na.rm = TRUE)/sqrt(100)))),
+                              "n" = sum(!is.na(x)))
+)
+IPMs_I_N_bootCI <- lapply(IPMs_I_N_bootCI, 
+                          FUN = as.numeric)
+
+names(IPMs_I_N_bootCI) <- unique(dat_all$Site)
+
+
 #### save the data to file ####
 fileLoc <- "./intermediate_analysis_Data/"
 ## site-level DI IPM matrices

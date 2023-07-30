@@ -15,7 +15,7 @@ dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
 
 ### IPMs for this analysis are in the "03_IPMs_C_N.R" file 
 #### read in data saved to file ####
-fileLoc <- "./intermediate_analysis_Data/site_level_IPMs_allYears/"
+fileLoc <- "./intermediate_analysis_Data/"
 
 ## site-level DI IPM matrices
 IPMs_C_H <- readRDS(file = paste0(fileLoc,"/IPMs_C_H.RDS"))
@@ -153,7 +153,7 @@ subPop_AIC_compare$type <- c("DI", "DD", "DI-DD")
 ## these data go into Table 4
 
 #### compare lambdas and subpop N ####
-## site-level IPM matrices are read in preivously in this script as "IPMs_C_H" (DI models) and 
+## site-level IPM matrices are read in previously in this script as "IPMs_C_H" (DI models) and 
 # "IPMs_I_N" (DD models)
 
 # calculate lambdas
@@ -166,7 +166,7 @@ site_lams <- rbind(siteDI_lams, siteDD_lams)
 
 ## get lambdas from each year and each site
 # have to read in IPMs from file ("IPMs_CC_HH" are DI models for 2018-2019; "IPMs_II_NN" are DI models for 2019-2020)
-fileLoc <- "./intermediate_analysis_Data/site_level_IPMs_eachYear/"
+fileLoc <- "./intermediate_analysis_Data/"
 ## site-level DI IPM matrices for 2018-2019
 IPMs_CC_HH <- readRDS(file = paste0(fileLoc,"/IPMs_CC_HH.RDS"))
 ## site-level DI IPM matrices for 2019-2020
@@ -174,13 +174,20 @@ IPMs_II_NN <- readRDS(file = paste0(fileLoc,"/IPMs_II_NN.RDS"))
 
 ## calculate lambdas
 # 2018-2019
-siteDI_firstYr_lams <- sapply(IPMs_CC_HH, function(x) as.numeric(eigen(x)$values[1]))
+siteDI_firstYr_lams <- sapply(IPMs_CC_HH, function(x) as.numeric(eigen(x$KMatrix)$values[1]))
 siteDI_firstYr_lams <- data.frame("Site" = names(siteDI_firstYr_lams), "log_lambda" = unname(log(siteDI_firstYr_lams)), "type" = "DI", "Year" = 2018)
 # 2019-2020
-siteDI_secondYr_lams <- sapply(IPMs_II_NN, function(x) as.numeric(eigen(x)$values[1]))
+siteDI_secondYr_lams <- sapply(IPMs_II_NN, function(x) as.numeric(eigen(x$KMatrix)$values[1]))
 siteDI_secondYr_lams <- data.frame("Site" = names(siteDI_secondYr_lams), "log_lambda" = unname(log(siteDI_secondYr_lams)), "type" = "DI", "Year" = 2019)
 
 byYear_DI_lams <- rbind(siteDI_firstYr_lams, siteDI_secondYr_lams)
+# update names for IPMs (don't need year identifer, since it's in a separate column)
+byYear_DI_lams[byYear_DI_lams$Site %in% c("Crow_Creek_18_19", "Crow_Creek_19_20"), "Site"] <- "Crow_Creek"
+byYear_DI_lams[byYear_DI_lams$Site %in% c("Diamond_Creek_18_19", "Diamond_Creek_19_20"), "Site"] <- "Diamond_Creek"
+byYear_DI_lams[byYear_DI_lams$Site %in% c("Unnamed_Creek_18_19", "Unnamed_Creek_19_20"), "Site"] <- "Unnamed_Creek"
+byYear_DI_lams[byYear_DI_lams$Site %in% c("HQ5_18_19", "HQ5_19_20"), "Site"] <- "HQ5"
+byYear_DI_lams[byYear_DI_lams$Site %in% c("HQ3_18_19", "HQ3_19_20"), "Site"] <- "HQ3"
+byYear_DI_lams[byYear_DI_lams$Site %in% c("Meadow_18_19", "Meadow_19_20"), "Site"] <- "Meadow"
 
 # get values for population size for each site in each year
 N_site <- unique(dat_all[,c("Site", "Year", "N_Site_t")]) 
@@ -234,7 +241,7 @@ logLambda_nt_figure <- ggplot(data = byYear_DI_lams) +
   #geom_ribbon(aes(x = log(N_Site_t), ymin = lwr, ymax = upr), data = modPreds, col = "lightgrey", fill = "lightgrey", alpha = .5) +
   #geom_line(aes(x = log(N_Site_t), y = fit), data = modPreds, lty = 2, lwd = 1) +
   geom_point(aes(x = log(N_Site_t), y = log_lambda, col = Site)) + 
-  geom_smooth(aes(x = log(N_Site_t), y = log_lambda, col = Site), se = FALSE, method = "lm", lty = 1, lwd = .75) +
+  geom_smooth(aes(x = log(N_Site_t), y = log_lambda, col = Site), se = FALSE, method = "lm", lty = 1, linewidth = .75) +
   xlab(expression(paste("log(N ", italic(t),")"))) +
   scale_color_brewer(type = "qual", palette = "Dark2") +
   ylab(expression(paste("log(", lambda,"), year ", italic(t)))) +
@@ -253,7 +260,7 @@ logLambda_nt_distFig <- ggplot() +
   geom_ribbon(aes(x = seq(-3.25,1.5,length.out = 60)[41:60],  ymin = 0, ymax = dnorm(x = c(seq(-3.25,1.5,length.out = 60)), mean = mean(slopeDist), sd = sd(slopeDist))[41:60]), colour = "grey80", fill = "grey80") +
   geom_vline(aes(xintercept = 0), lty = 2, col = "darkgrey") +
   geom_line(aes(x = seq(-17,1.5,length.out = 60), y = dnorm(x = c(seq(-17,1.5,length.out = 60)), mean = mean(slopeDist), sd = sd(slopeDist)))) + 
-  geom_rug((aes(x = slopeDist, col = names(slopeDist))), lwd = 1) + 
+  geom_rug((aes(x = slopeDist, col = names(slopeDist))), lwd = 1, length = unit(0.1, "npc")) + 
   xlab(expression(paste("slope of log(", lambda, ") ~ log(N ",italic(t), ")"))) + 
   ylab("Probability") + 
   theme_classic() +
@@ -284,7 +291,7 @@ ntplus1_nt_distFig <- ggplot() +
                   ymax = dnorm(x = c(seq(-3,.5,length.out = 50)), mean = mean(slopeDist_2), sd = sd(slopeDist_2))[43:50]), colour = "grey80", fill = "grey80") + 
   geom_vline(aes(xintercept = 0), lty = 2, col = "darkgrey") +
   geom_line(aes(x = seq(-4.5,.5,length.out = 50), y = dnorm(x = c(seq(-4.5,.5,length.out = 50)), mean = mean(slopeDist_2), sd = sd(slopeDist_2)))) + 
-  geom_rug(aes(x = slopeDist_2, color = names(slopeDist_2)), lwd = 1) + 
+  geom_rug(aes(x = slopeDist_2, color = names(slopeDist_2)), lwd = 1, length = unit(0.1, "npc")) + 
   xlab(expression(paste("slope of log(N ",italic(t+1)," / N ", italic(t) ,") ~ log(N", italic(t), ")"))) + 
   ylab("Probability") + 
   theme_classic() +
@@ -292,4 +299,6 @@ ntplus1_nt_distFig <- ggplot() +
 # probability of a value higher than 0
 pnorm(0, mean = mean(slopeDist_2), sd = sd(slopeDist_2), lower.tail = FALSE)
 
-ggarrange(logLambda_nt_figure, ntplus1_nt_figure, logLambda_nt_distFig, ntplus1_nt_distFig, ncol = 2, nrow = 2, common.legend = TRUE, heights = c(1,.75), legend = "right", align = "v", labels = c("A", "B", "C", "D"))
+DDfigure <- ggarrange(logLambda_nt_figure, ntplus1_nt_figure, logLambda_nt_distFig, ntplus1_nt_distFig, ncol = 2, nrow = 2, common.legend = TRUE, heights = c(1,.75), legend = "right", align = "v", labels = c("A", "B", "C", "D"))
+
+ggsave("./figures/densityDependenceFigure.pdf", plot = DDfigure)
