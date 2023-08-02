@@ -6,6 +6,9 @@
 
 library(tidyverse)
 library(rstatix)
+library(tidyverse)
+library(sf)
+library(vegan)
 
 # load data from script 1
 dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
@@ -34,10 +37,8 @@ CI_lambdas <- (as.data.frame(sapply(subPop_bootCI_lambdas, function(x) unlist(as
 CI_lambdas <- CI_lambdas[,c("Crow_Creek","Diamond_Creek",  "HQ5",  "HQ3",  "Meadow", "Unnamed_Creek")]
 lambdaCor <- cor(log(CI_lambdas), method= "spearman")       
 
-#### get spatial data for subPlot location ####
-library(tidyverse)
-library(sf)
 
+#### get spatial data for subPlot location ####
 # load dataset
 counts<- read.csv("../Raw Data/COBP_data_10_25_20.csv", stringsAsFactors = FALSE) #will have to update file name as it changes w/ most current version
 sites <- read.csv("../Raw Data/COBP Plot Locations.csv", stringsAsFactors = FALSE)
@@ -78,7 +79,6 @@ colnames(plotDist_mat) <- site_subP$SubPop
 rownames(plotDist_mat) <- site_subP$SubPop
 
 #### perform a mantel test! ####
-library(vegan)
 vegan::mantel(plotDist_mat, lambdaCor, permutations = 1000, method = "spearman")
 
 #### compare correlations just for each population ####
