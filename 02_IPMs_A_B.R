@@ -584,6 +584,13 @@ for(i in 1:1000) {
   allDI_params[[i]] <- paramCont_now
 }
 
+## calculate 95% CI
+ipm_B_CI_lambdasVec <- log(sapply(allDI_lambdas, unlist))
+SE <- sd(ipm_B_CI_lambdasVec)/sqrt(1000)
+mean <- mean(ipm_B_CI_lambdasVec)
+ipm_B_CI_log <- c((mean - 1.96*SE),(mean + 1.96*SE))
+
+
 ### plot the values
 # get the parameters out
 for (i in 1:1000) {
