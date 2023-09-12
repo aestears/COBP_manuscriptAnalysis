@@ -440,72 +440,6 @@ summary(recMod_env)
 ## Probability that a seed from a plant in year t will go directly to the seedling stage ($goSdlng$)
 #goSdlng.est
 
-#### Vital Rate Models for the Stochastic, density-dependent IPM for all data with random effect for site and environmental covariates ####
-## Survival ($s(z)$)
-# data: survDat_all
-dat$log_LL_t_s <- scale(dat$log_LL_t)
-# logistic glm with log-transformed size_t
-survMod_e_dd <- glmer(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s  + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_plot + (1|Plot_ID), data = survDat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-summary(survMod_e_dd)
-# try excluding the precip data (is not significant in the previous model)
-survMod_e_dd_1 <- glmer(survives_tplus1 ~ log_LL_t + tMean_grow_C_s + N_all_plot +  (1|Plot_ID),  data = survDat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-summary(survMod_e_dd_1)
-## survMod_e_1 is the better fit, use this model
-survMod_env_dd <- survMod_e_dd_1
-
-## Growth ($G(z',z)$)
-# lm w/ log-transformed size_t and size_t+1
-sizeMod_e_dd <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s + N_all_plot + (1|Plot_ID), data = dat_all)
-summary(sizeMod_e_dd)
-# remove soilTemp in winter and growing season; drop precip
-sizeMod_e_dd_1 <- lmer(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  tMean_grow_C_s + N_all_plot + (1|Plot_ID), data = dat_all)
-summary(sizeMod_e_dd_1)
-sizeMod_env_dd <- sizeMod_e_dd_1
-
-## Number of seeds produced, according to plant size ($b(z)$)
-# data: seedDat 
-# fit poisson glm (for count data)
-seedMod_e_dd <- lme4::glmer.nb(Num_seeds ~ log_LL_t + SoilMoisture_m3m3_s + SoilTemp_winter_C_s + SoilTemp_grow_C_s + tMean_grow_C_s + precipWaterYr_cm_s +  N_all_plot + (1|Plot_ID), data = seedDat_all, family = poisson)
-summary(seedMod_e_dd)
-# remove soil moisture, soil temp grow, soil temp winter (not significant)
-seedMod_e_dd_1 <- lme4::glmer.nb(Num_seeds ~ log_LL_t + tMean_grow_C_s + precipWaterYr_cm_s + (1|Plot_ID) , data = seedDat_all, family = poisson)
-summary(seedMod_e_dd_1)
-## use the final model w/ no density dependence
-seedMod_env_dd <- seedMod_e_dd_1
-
-## Flowering probability ($p_b(z)$)
-# using size in current year (w/ squared term)
-# logistic glm with log-transformed size_t
-flwrMod_e_dd <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  +  N_all_plot + (1|Plot_ID), data = dat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-summary(flwrMod_e_dd)
-# remove density dependence
-flwrMod_e_dd_1 <- glmer(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C_s  + (1|Plot_ID), data = dat_all, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-summary(flwrMod_e_dd_1)
-# final model has no density dependence
-flwrMod_env_dd <- flwrMod_e_dd
-
-## Distribution of recruit size ($c_o(z')$)
-# data = recD
-# fit the model
-recMod_env_dd <- lmer(log_LL_t ~ SoilMoisture_m3m3_s + N_all_plot + (1|Plot_ID), data = recD_all)
-summary(recMod_env_dd)
-#plot the results
-
-## Probability of a seedling in year *t* establishing to a rosette in year *t+1* ($p_{estab}$)
-#p.estab.est
-
-## Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1 ($outSB$)
-#outSB.est 
-
-## Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1 ($staySB$)
-#staySB.est 
-
-## Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1 ($goSB$)
-#goSB.est
-
-## Probability that a seed from a plant in year t will go directly to the seedling stage ($goSdlng$)
-#goSdlng.est 
-
 #### Models by site (deterministic, no env covariates, DI) ####
 ### Make vital rate models (put inside a for-loop; store models in a list)
 # make an empty list to hold models
@@ -732,3 +666,4 @@ for (i in 1:length(siteNames)) {
   names(stoch_DD_mods)[i] <- site_now
 }
 ## use uniform p.estab, outSB, staySB, and goSB estimates 
+
