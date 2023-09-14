@@ -12,14 +12,21 @@ library(ggmap)
 library(ggspatial)
 library(ggrepel)
 
+# load data
+#source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
+dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
+discDat <- read.csv(file = "../Processed_Data/discreteStageData.csv")
+
+
 #### figure of vital rates (all data, DI, all transitions) ####
 datSoap <- dat_all[dat_all$Location=="Soapstone",]
 survDat_soap <- datSoap[datSoap$flowering==0 | is.na(datSoap$flowering),]
 survMod_soap <- glm(survives_tplus1 ~ log_LL_t , data = survDat_soap, family = binomial)
-newdata <- data.frame("log_LL_t" = seq(from = min(survDat_all$log_LL_t, na.rm = TRUE), 
-                                       to = max(survDat_all$log_LL_t, na.rm = TRUE),
+newdata <- data.frame("log_LL_t" = seq(from = min(survDat_soap$log_LL_t, na.rm = TRUE), 
+                                       to = max(survDat_soap$log_LL_t, na.rm = TRUE),
                                        length.out = 100))
-lines(x = newdata$log_LL_t, y = predict(object = survMod_all, newdata =  newdata, type = "response"), col = "red")
+plot(x = survDat_soap$log_LL_t, y = survDat_soap$survives_tplus1)
+lines(x = newdata$log_LL_t, y = predict(object = survMod_soap, newdata =  newdata, type = "response"), col = "red")
 
 ## Growth ($G(z',z)$)
 # lm w/ log-transformed size_t and size_t+1
@@ -37,10 +44,11 @@ recMod_soap <- lm(log_LL_t ~ 1, data = recD_soap)
 datBase <- dat_all[dat_all$Location=="FEWAFB",]
 survDat_Base <- datBase[datBase$flowering==0 | is.na(datBase$flowering),]
 survMod_Base <- glm(survives_tplus1 ~ log_LL_t , data = survDat_Base, family = binomial)
-newdata <- data.frame("log_LL_t" = seq(from = min(survDat_all$log_LL_t, na.rm = TRUE), 
-                                       to = max(survDat_all$log_LL_t, na.rm = TRUE),
+newdata <- data.frame("log_LL_t" = seq(from = min(survDat_Base$log_LL_t, na.rm = TRUE), 
+                                       to = max(survDat_Base$log_LL_t, na.rm = TRUE),
                                        length.out = 100))
-lines(x = newdata$log_LL_t, y = predict(object = survMod_all, newdata =  newdata, type = "response"), col = "red")
+plot(x = survDat_Base$log_LL_t, y = survDat_Base$survives_tplus1)
+lines(x = newdata$log_LL_t, y = predict(object = survMod_Base, newdata =  newdata, type = "response"), col = "red")
 
 ## Growth ($G(z',z)$)
 # lm w/ log-transformed size_t and size_t+1
@@ -132,10 +140,22 @@ ggpubr::ggarrange(survFig, sizeFig, flwrFig, seedFig, align = "hv",
                   legend = "bottom", legend.grob = legend,
                   labels = c("A", "B", "C", "D"))
 
+## write to file
+pdf(file = "./COBP_demography_MANUSCRIPT/figures/vitalRateModelFit.pdf", width =  7, height = 5)
+
+ggpubr::ggarrange(survFig, sizeFig, flwrFig, seedFig, align = "hv", 
+                  legend = "bottom", legend.grob = legend,
+                  labels = c("A", "B", "C", "D"))
+dev.off()
+
 #### figure of IPM matrix (all data, DI, all transitions) ####
 # matrices are called 'mat_all_Soap' and 'mat_all_Base'
+# read in IPM "B"
+load("./intermediate_analysis_Data/ipmA_B_results.RData")
+# called "ipm_B"
+
 # "mat_all_DI" is from script 04
-image(t(mat_all_DI)^.1)
+image(t(ipm_B$sub_kernels$P + ipm_B$sub_kernels$F)^.1)
 
 #ipmr model 
 contSeedlings_IPM$sub_kernels$continuous_to_seedbank
@@ -145,17 +165,19 @@ contSeedlings_IPM$sub_kernels$continuous_to_seedbank
 meshpts <- seq(from = L, to = U, length = 500)
 # set up the palette to the continuous part of the kernel (leave out first two rows and cols that correspond to the discrete stages)
 ## make the entire figure as a lattice plot
+
+pdf(file = "./figures/IPM_kernel_figure.pdf", width =  6, height = 4)
 graphics::layout(mat = matrix(c(1,3,2,4), nrow = 2, ncol = 2), widths = c(1.5,6),heights = c(6,1.5))
 ## continuous to seedbank
 pal <- hcl.colors(n = 100, palette = "Heat 2", rev = TRUE)
 par(mar = c(3,3,3,1))
 image((
-  contSeedlings_IPM$sub_kernels$continuous_to_seedbank), xaxt = "n", yaxt = "n",
+  ipm_B$sub_kernels$continuous_to_seedbank), xaxt = "n", yaxt = "n",
       #main = "B(t+1)",
       col = pal[(round(min((
-        contSeedlings_IPM$sub_kernels$continuous_to_seedbank)^.2),2)*100): 
+        ipm_B$sub_kernels$continuous_to_seedbank)^.2),2)*100): 
                   (round(max((
-                    contSeedlings_IPM$sub_kernels$continuous_to_seedbank)^.2),2)*100)]) 
+                    ipm_B$sub_kernels$continuous_to_seedbank)^.2),2)*100)]) 
 mtext(side = 3, text  = c("Seedbank"), line = 1, cex = 1, font = 2)
 mtext(side = 2, c("Next Year (t+1)"), xpd = NA, cex = 1, font = 2, line = .75)
 
@@ -163,32 +185,32 @@ mtext(side = 2, c("Next Year (t+1)"), xpd = NA, cex = 1, font = 2, line = .75)
 par(mar = c(3,3,3,3)
     ,mgp = c(1.75,.5,0)
 )
-image(x = meshpts, y = meshpts, t(contSeedlings_IPM$sub_kernels$P + contSeedlings_IPM$sub_kernels$F) ^.2,
+image(x = meshpts, y = meshpts, t(ipm_B$sub_kernels$P + ipm_B$sub_kernels$F) ^.2,
       xlab = "n(z,t); log(cm)", ylab = "n(z',t+1); log(cm)", 
       main = "Continuous Stage",
-      col = pal[(round(min( t(contSeedlings_IPM$sub_kernels$P + contSeedlings_IPM$sub_kernels$F)^.2),2)*100): 
-                  (round(max(t(contSeedlings_IPM$sub_kernels$P + contSeedlings_IPM$sub_kernels$F)^.2),2)*100)]
+      col = pal[(round(min( t(ipm_B$sub_kernels$P + ipm_B$sub_kernels$F)^.2),2)*100): 
+                  (round(max(t(ipm_B$sub_kernels$P + ipm_B$sub_kernels$F)^.2),2)*100)]
 ) ## get the correct values for the color ramp that correspond to the actual probabilities in the entire matrix
 text(x = 4.8, y = 1, c("Continuous Stage"), xpd = NA, srt = -90, cex = 1.25, font = 2)
 abline(a = 0, b = 1, lty = 2, col = "grey30")
 contour(x = meshpts, y = meshpts, 
-        t(contSeedlings_IPM$sub_kernels$P + contSeedlings_IPM$sub_kernels$F), 
+        t(ipm_B$sub_kernels$P + ipm_B$sub_kernels$F), 
         add = TRUE, drawlabels = TRUE, nlevels = 10, col = "grey30")
 
 ## seedbank to seedbank
 par(mar = c(2,3,1,1))
-image(contSeedlings_IPM$sub_kernels$seedbank_to_seedbank^.2, xaxt = "n", yaxt = "n", 
-      col = pal[(contSeedlings_IPM$sub_kernels$seedbank_to_seedbank^.2)*100]) 
-mtext(side = 1, text  = c(0.71), line = -1, cex = .75)
+image(ipm_B$sub_kernels$seedbank_to_seedbank^.2, xaxt = "n", yaxt = "n", 
+      col = pal[(ipm_B$sub_kernels$seedbank_to_seedbank^.2)*100]) 
+mtext(side = 1, text  = c(0.75), line = -1, cex = .75)
 ## seedbank to continuous
 par(mar = c(2,3,1,3))
 image((
-  contSeedlings_IPM$sub_kernels$seedbank_to_continuous), xaxt = "n", yaxt = "n",
+  ipm_B$sub_kernels$seedbank_to_continuous), xaxt = "n", yaxt = "n",
   #main = "B(t+1)",
   col = pal[(round(min((
-    contSeedlings_IPM$sub_kernels$seedbank_to_continuous)^.2),2)*100): 
+    ipm_B$sub_kernels$seedbank_to_continuous)^.2),2)*100): 
       (round(max((
-        contSeedlings_IPM$sub_kernels$seedbank_to_continuous)^.2),2)*100)]) 
+        ipm_B$sub_kernels$seedbank_to_continuous)^.2),2)*100)]) 
 #text(x = side  = 4, text = "Seedbank",las = 0, crt =180)
 text(x = 1.05, y = .25, c("Seedbank"), xpd = NA, srt = -90, cex = 1.25, font = 2)
 mtext(side = 1, c("Current Year (t)"), xpd = NA, cex = 1, font = 2, line = .75)
@@ -197,12 +219,12 @@ dev.off()
 #### figures of elasticity and sensitivity matrices ####
 # calculate elasticity and sensitivity matrices
 ## calculate the stable size distribution
-w.eigen_test <-  right_ev(contSeedlings_IPM)
+w.eigen_test <-  right_ev(ipm_B)
 w.eigen_test <- c(w.eigen_test$b_w,w.eigen_test$size_w)
 stable.dist_test <- w.eigen_test/sum(w.eigen_test) 
 
 ## calculate the reproductive value distribution
-v.eigen_test <- left_ev(contSeedlings_IPM)
+v.eigen_test <- left_ev(ipm_B)
 v.eigen_test <- c(v.eigen_test$b_v, v.eigen_test$size_v)
 repro.val_test <- v.eigen_test/v.eigen_test[1]
 
@@ -211,8 +233,10 @@ v.dot.w_test <- sum(stable.dist_test * repro.val_test)*h
 # calculate the sensitivity function (whole kernel)
 sens_test <- outer(repro.val_test,stable.dist_test, '*')/(v.dot.w_test)
 # calculate the elasticity function (whole kernel)
-elas_test <- matrix(as.vector(sens_test)*as.vector(mat_all_DI)/lambda(contSeedlings_IPM),nrow=501)
+elas_test <- matrix(as.vector(sens_test)*as.vector(mat_all_DI)/lambda(ipm_B),nrow=501)
 
+
+pdf(file = "./figures/elasticityFig.pdf", width =  5, height = 4)
 ### elas figure
 graphics::layout(mat = matrix(c(1,3,2,4), nrow = 2, ncol = 2), widths = c(1.5,6),heights = c(6,1.5))
 ## continuous to seedbank
@@ -259,6 +283,7 @@ mtext(side = 1, c("Current Year (t)"), xpd = NA, cex = 1, font = 2, line = .75)
 dev.off()
 
 ### sensitivity figure
+pdf(file = "./figures/sensitivityFig.pdf", width =  5, height = 4)
 graphics::layout(mat = matrix(c(1,3,2,4), nrow = 2, ncol = 2), widths = c(1.5,6),heights = c(6,1.5))
 ## continuous to seedbank
 pal <- hcl.colors(n = 100, palette = "Heat 2", rev = TRUE)
@@ -303,7 +328,6 @@ text(x = 1.05, y = .25, c("Seedbank"), xpd = NA, srt = -90, cex = 1.25, font = 2
 mtext(side = 1, c("Current Year (t)"), xpd = NA, cex = 1, font = 2, line = .75)
 
 dev.off()
-
 
 # density dependence figs -------------------------------------------------
 siteDI_bootLambdas <- readRDS("~/Dropbox/Grad School/Research/Oenothera coloradensis project/COBP_analysis/intermediate_analysis_Data/site_level_IPMs_allYears/site_level_DI_bootCI_lambdas.RDS")
