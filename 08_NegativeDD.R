@@ -302,3 +302,6 @@ pnorm(0, mean = mean(slopeDist_2), sd = sd(slopeDist_2), lower.tail = FALSE)
 DDfigure <- ggarrange(logLambda_nt_figure, ntplus1_nt_figure, logLambda_nt_distFig, ntplus1_nt_distFig, ncol = 2, nrow = 2, common.legend = TRUE, heights = c(1,.75), legend = "right", align = "v", labels = c("A", "B", "C", "D"))
 
 ggsave("./figures/densityDependenceFigure.pdf", plot = DDfigure)
+
+#### test figure w/out log-transformed values (to see if comparing log to log is changing my results...)
+
