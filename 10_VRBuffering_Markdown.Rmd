@@ -1463,8 +1463,8 @@ minSD_fig <- ggplot(bigDF_minSbSd) +
                       ymax = mean_corrSD + (2*sd_corrSD), 
                       col = VitalRate, 
                       pch = VitalRateType)) + 
-  xlab("mean VSS") +
-  ylab("mean corrected SD") + 
+  xlab("Importance (logit VSS or elasiticity)") +
+  ylab("Variability (corrected SD)") + 
   geom_label(aes(x = 1.5, y = -1, 
                 label = paste0("r = ", round(cor_minSbSd$estimate, 2),"; P-val = ", round(cor_minSbSd$p.value, 3))),
              label.size = NA) +
@@ -1511,8 +1511,8 @@ maxSD_fig <- ggplot(bigDF_maxSbSd) +
                       ymax = mean_corrSD + (2*sd_corrSD), 
                       col = VitalRate, 
                       pch = VitalRateType)) + 
-  xlab("mean VSS") +
-  ylab("mean corrected SD") + 
+  xlab("Importance (logit VSS or elasiticity)") +
+  ylab("Variability (corrected SD)") +  
   geom_label(aes(x = 1.5, y = -.8, label = paste0("r = ", round(cor_maxSbSd$estimate, 2),"; P-val = ", round(cor_maxSbSd$p.value, 3))),
              label.size = NA) +
   theme_classic() +
