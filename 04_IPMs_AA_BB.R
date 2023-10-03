@@ -79,10 +79,10 @@ paramsSoap <- list(
   b_slope = coef(seedMod_soap)[2],
   c_o_mu    = coef(recMod_soap), #recruit size distribution
   c_o_sd    = summary(recMod_soap)$sigma,
-  outSB  = outSB,
-  staySB = staySB,
-  goSB   = goSB, 
-  goCont = goCont                  
+  outSB  = outSB_all,
+  staySB = staySB_all,
+  goSB   = goSB_all, 
+  goCont = goCont_all                  
 )
 
 # Define the lower and upper integration limit
@@ -116,12 +116,12 @@ c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
 # make the continuous part of the P matrix
 Pkernel.cont <- as.matrix(G %*% S_new)
 # seedbank (first column of your K)
-Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+Pkernel.seedbank = c(staySB_all, outSB_all*c_o[,1]) # seeds survive and go to continuous
 # Make the full P kernel
 Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
 ## make the F kernel
-Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
-Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+Fkernel.cont <-  as.matrix(goCont_all * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+Fkernel.discr  <- matrix(c(0, goSB_all * (FecALL)), nrow = 1)
 Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 mat_IPM_AA <-Pkernel+Fkernel
 lam_IPM_AA <- eigen(mat_IPM_AA)$values[1]

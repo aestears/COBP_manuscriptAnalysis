@@ -24,6 +24,7 @@ surv.seeds <-  0.9 # survival of seeds
 
 ## make an empty list to hold the IPM kernels 
 IPMs_CC_HH <- list()
+IPMs_CC_HH_params <- list()
 for (i in 1:length(unique(dat_all$Site))) {
   ## get data for this 'current' site
   dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i] # data for this site
@@ -142,9 +143,13 @@ for (i in 1:length(unique(dat_all$Site))) {
                           leaveSB_vec = as.matrix((outSB*c_o[,1]), nrow = 500, ncol = 1), 
                           goSB_vec = matrix(c( goSB * (FecALL)), nrow = 1), 
                           params = paramCont)
+  
+  
+  IPMs_CC_HH_params[[i]] <- paramCont 
 }
 names(IPMs_CC_HH) <- paste0(unique(dat_all$Site), "_18_19")
 lambdas_IPMs_CC_HH <- sapply(IPMs_CC_HH, FUN = function(x) eigen(x[1][[1]])$values[1])
+names(IPMs_CC_HH_params) <- paste0(unique(dat_all$Site), "_18_19")
 
 ## estimate 95% Bootstrap CIs 
 IPMs_CC_HH_bootCI_lambdas <- list()
@@ -309,6 +314,7 @@ surv.seeds <-  0.9 # survival of seeds
 
 ## make an empty list to hold the IPM kernels 
 IPMs_II_NN <- list()
+IPMs_II_NN_params <- list()
 for (i in 1:length(unique(dat_all$Site))) {
   ## get data for this 'current' site
   dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i] # data for this site
@@ -427,9 +433,13 @@ for (i in 1:length(unique(dat_all$Site))) {
                           leaveSB_vec = as.matrix((outSB*c_o[,1]), nrow = 500, ncol = 1), 
                           goSB_vec = matrix(c( goSB * (FecALL)), nrow = 1),
                           params = paramCont)
+  
+  
+  IPMs_II_NN_params[[i]] <- paramCont 
 }
 names(IPMs_II_NN) <- paste0(unique(dat_all$Site), "_19_20")
 lambdas_IPMs_II_NN <- sapply(IPMs_II_NN, FUN = function(x) eigen(x[1][[1]])$values[1])
+names(IPMs_II_NN_params) <- paste0(unique(dat_all$Site), "_19_20")
 
 ## estimate 95% Bootstrap CIs 
 IPMs_II_NN_bootCI_lambdas <- list()

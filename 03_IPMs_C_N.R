@@ -25,6 +25,8 @@ surv.seeds <-  0.9 # survival of seeds
 
 ## make an empty list to hold the IPM kernels 
 IPMs_C_H <- list()
+IPMs_C_H_params <- list()
+
 for (i in 1:length(unique(dat_all$Site))) {
   ## get data for this 'current' site
   dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i],]
@@ -148,9 +150,12 @@ for (i in 1:length(unique(dat_all$Site))) {
   eigenMat <- eigen(mat)
   
   IPMs_C_H[[i]] <- mat
+  
+  IPMs_C_H_params[[i]] <- paramCont 
 }
 names(IPMs_C_H) <- paste0(unique(dat_all$Site))
 lambdas_IPMs_C_H <- sapply(IPMs_C_H, FUN = function(x) eigen(x)$values[1])
+names(IPMs_C_H_params) <- paste0(unique(dat_all$Site))
 
 ## estimate bootstrap confidence intervals for each model parameter for each site
 # make an empty list to hold the estimate results (parameters, labmda)
@@ -343,6 +348,7 @@ surv.seeds <-  0.9 # survival of seeds
 
 ## make an empty list to hold the IPM kernels 
 IPMs_I_N <- list()
+IPMs_I_N_params <- list()
 for (i in 1:length(unique(dat_all$Site))) {
   ## get data for this 'current' site
   dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i],]
@@ -464,11 +470,14 @@ for (i in 1:length(unique(dat_all$Site))) {
   mat <-Pkernel+Fkernel
   
   IPMs_I_N[[i]] <- mat
+  
+  IPMs_I_N_params[[i]] <- paramCont 
 }
 
 names(IPMs_I_N) <- paste0(unique(dat_all$Site))
 
 lambdas_IPMs_I_N <- sapply(IPMs_I_N, FUN = function(x) eigen(x)$values[1])
+names(IPMs_I_N_params) <- paste0(unique(dat_all$Site))
 
 ### get bootstrap confidence intervals
 ## estimate bootstrap confidence intervals for each model parameter for each site

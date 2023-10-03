@@ -5,9 +5,58 @@
 # 08 December 2021
 #/////////////////////////
 
-#### load vital rate models from previous script ####
+#### fit vital rate models ####
+# read in vital rate models
 source("./analysis_scripts/01_VitalRateModels.R")
+# read in data
+dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
 
+for (i in 1:length(unique(dat_all$Site))) {
+  dat_now <- dat_all[dat_all$Site == unique(dat_all$Site)[i],]
+  ## vital rate models for each sites, including density dependence and all env. covariates 
+  ## Survival ($s(z)$)
+  survDat <- dat_now[dat_now$flowering==0,]
+  # logistic glm with log-transformed size_t
+  survMod_e_dd <- glm(survives_tplus1 ~ log_LL_t + tMean_grow_C  + tMean_winter_C  + precipWaterYr_cm + N_all_plot , data = survDat, family = "binomial")
+  ## Growth ($G(z',z)$)
+  sizeMod_e_dd <- lm(log_LL_tplus1 ~ log_LL_t  + tMean_grow_C  + tMean_winter_C  + precipWaterYr_cm + N_all_plot , data = dat_now)
+  ## Number of seeds produced, according to plant size ($b(z)$)
+  seedDat <- dat_now[dat_now$flowering == 1,]
+  seedMod_e_dd <- MASS::glm.nb(Num_seeds ~ log_LL_t  + tMean_grow_C  + tMean_winter_C  + precipWaterYr_cm + N_all_plot , data = seedDat)
+  ## Flowering probability ($p_b(z)$)
+  flwrMod_e_dd <- glm(flowering ~ log_LL_t + I(log_LL_t^2)  + tMean_grow_C  + tMean_winter_C  + precipWaterYr_cm + N_all_plot , data = dat_now, family = "binomial")
+  ## Distribution of recruit size ($c_o(z')$)
+  recD = dat_now[dat_now$seedling==1,]
+  recMod_env_dd <- lm(log_LL_t ~ tMean_grow_C  + tMean_winter_C  + precipWaterYr_cm + N_all_plot, data = recD)
+  if (i == 1) {
+    dc_mods <- rbind(data.frame("flwr" = coef(flwrMod_e_dd),
+                          "surv" = c(coef(survMod_e_dd)[1:2], NA, coef(survMod_e_dd)[3:6]), 
+                          "grow" = c(coef(sizeMod_e_dd)[1:2],NA,coef(sizeMod_e_dd)[3:6]), 
+                          "seed" = c(coef(seedMod_e_dd)[1:2], NA, coef(seedMod_e_dd)[3:6]), 
+                          "rec" = c(coef(recMod_env_dd)[1], NA, NA, coef(recMod_env_dd)[2:5]), 
+                          "Site" = unique(dat_all$Site)[i]),
+                     c(NA, NA, sd(sizeMod_e_dd$residuals), NA, sd(recMod_env_dd$residuals),  unique(dat_all$Site)[i]))
+  } else {
+    dc_mods <- rbind(dc_mods, 
+                     data.frame("flwr" = coef(flwrMod_e_dd),
+                                "surv" = c(coef(survMod_e_dd)[1:2], NA, coef(survMod_e_dd)[3:6]), 
+                                "grow" = c(coef(sizeMod_e_dd)[1:2],NA,coef(sizeMod_e_dd)[3:6]), 
+                                "seed" = c(coef(seedMod_e_dd)[1:2], NA, coef(seedMod_e_dd)[3:6]), 
+                                "rec" = c(coef(recMod_env_dd)[1], NA, NA, coef(recMod_env_dd)[2:5]), 
+                                "Site" = unique(dat_all$Site)[i]),
+                     c(NA, NA, sd(sizeMod_e_dd$residuals), NA, sd(recMod_env_dd$residuals), unique(dat_all$Site)[i]))
+  }
+}
+
+dc_mods$vitalRate <- rep(x = c("Intercept", "log_LL_t", "I(log_LL_t^2)", "tMean_grow_C", "tMean_winter_C", "precipWaterYr_cm", "N_all_plot", "sd"), times = 6)
+# if the effect is 'NA', then replace with '0'
+dc_mods[is.na(dc_mods)] <- 0
+# make numeric
+dc_mods[,1] <- as.numeric(dc_mods[,1] )
+dc_mods[,2] <- as.numeric(dc_mods[,2] )
+dc_mods[,3] <- as.numeric(dc_mods[,3] )
+dc_mods[,4] <- as.numeric(dc_mods[,4] )
+dc_mods[,5] <- as.numeric(dc_mods[,5] )
 #### fit IPMs ####
 # use parameters in the 'dc_mods' d.f
 # vital rate functions
@@ -48,6 +97,9 @@ surv.seeds <-  0.9 # survival of seeds
 lambdas <- list()
 IPMs_S_X <- vector(mode = "list", length = 6)
 names(IPMs_S_X) <- unique(dc_mods$Site)
+IPMs_S_X_params <- vector(mode = "list", length = 6)
+names(IPMs_S_X_params) <- unique(dc_mods$Site)
+
 for (i in unique(dc_mods$Site)) {
   # get the data for this site
   dat_now <- dc_mods[dc_mods$Site == i,]
@@ -57,7 +109,7 @@ for (i in unique(dc_mods$Site)) {
     g_slope = dat_now[dat_now$vitalRate == "log_LL_t","grow"],
     g_dd  = dat_now[dat_now$vitalRate == "N_all_plot","grow"],
     g_tGrow = dat_now[dat_now$vitalRate == "tMean_grow_C","grow"],
-    g_sd = 0.4837,
+    g_sd = dat_now[dat_now$vitalRate == "sd", "grow"],
     s_int = dat_now[dat_now$vitalRate == "Intercept","surv"],
     s_slope = dat_now[dat_now$vitalRate == "log_LL_t","surv"],
     s_dd = dat_now[dat_now$vitalRate == "N_all_plot","surv"],
@@ -77,7 +129,7 @@ for (i in unique(dc_mods$Site)) {
     c_o_dd = dat_now[dat_now$vitalRate == "N_all_plot","rec"],
     c_o_tGrow = dat_now[dat_now$vitalRate == "tMean_grow_C","rec"],
     c_o_tWinter = dat_now[dat_now$vitalRate == "tMean_winter_C","rec"],
-    c_o_sd = 0.7684952
+    c_o_sd = dat_now[dat_now$vitalRate == "sd", "rec"]
   )
   # set up IPM
   L <-  1.2 * min(dat_all$log_LL_t, na.rm = TRUE) # minimum size
@@ -111,6 +163,8 @@ for (i in unique(dc_mods$Site)) {
   lambdas[[i]] <- lam_now
   
   IPMs_S_X[[i]] <- mat_all_DD
+  
+  IPMs_S_X_params[[i]] <- paramNow
 }
 
 #### save the data to file ####
