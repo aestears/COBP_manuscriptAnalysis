@@ -237,71 +237,60 @@ modPreds <- modPreds %>%
             lwr = mean(lwr), 
             upr = mean(upr))
 # plot DI subpop-level lambdas for each transition according to size in year_t
-logLambda_nt_figure <- ggplot(data = byYear_DI_lams) + 
+
+
+# get slopes of line for each site
+slopeDist <- c(coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Crow_Creek",]))[2],
+               coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Diamond_Creek",]))[2],
+               coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ3",]))[2],
+               coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ5",]))[2],
+               coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Meadow",]))[2],
+               coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Unnamed_Creek",]))[2])
+names(slopeDist) <- c("Crow_Creek", "Diamond_Creek", "HQ3", "HQ5", "Meadow", "Unnamed_Creek")
+slopeDist <- data.frame("Site" = names(slopeDist), "slope" = round(slopeDist,1),
+                        "x" = c(5.8, 6.4, 5.4, 6.9, 4.7, 6.5),
+                        "y" = c(.645, .8, .4, .6, .5, .33))
+
+(logLambda_nt_figure <- ggplot(data = byYear_DI_lams) + 
   #geom_ribbon(aes(x = log(N_Site_t), ymin = lwr, ymax = upr), data = modPreds, col = "lightgrey", fill = "lightgrey", alpha = .5) +
   #geom_line(aes(x = log(N_Site_t), y = fit), data = modPreds, lty = 2, lwd = 1) +
+  geom_smooth(aes(x = log(N_Site_t), y = log_lambda), se = FALSE, method = "lm", lty = 2, linewidth = .75, col = "grey") +
   geom_point(aes(x = log(N_Site_t), y = log_lambda, col = Site)) + 
   geom_smooth(aes(x = log(N_Site_t), y = log_lambda, col = Site), se = FALSE, method = "lm", lty = 1, linewidth = .75) +
   xlab(expression(paste("log(N ", italic(t),")"))) +
   scale_color_brewer(type = "qual", palette = "Dark2") +
   ylab(expression(paste("log(", lambda,"), year ", italic(t)))) +
-  theme_classic()
-
-# get slopes of line for each site
-slopeDist <- c(coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Crow_Creek",]))[2],
-coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Diamond_Creek",]))[2],
-coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ3",]))[2],
-coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ5",]))[2],
-coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Meadow",]))[2],
-coefficients(lm(log_lambda ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Unnamed_Creek",]))[2])
-names(slopeDist) <- c("Crow_Creek", "Diamond_Creek", "HQ3", "HQ5", "Meadow", "Unnamed_Creek")
-
-logLambda_nt_distFig <- ggplot() +
-  geom_ribbon(aes(x = seq(-3.25,1.5,length.out = 60)[41:60],  ymin = 0, ymax = dnorm(x = c(seq(-3.25,1.5,length.out = 60)), mean = mean(slopeDist), sd = sd(slopeDist))[41:60]), colour = "grey80", fill = "grey80") +
-  geom_vline(aes(xintercept = 0), lty = 2, col = "darkgrey") +
-  geom_line(aes(x = seq(-17,1.5,length.out = 60), y = dnorm(x = c(seq(-17,1.5,length.out = 60)), mean = mean(slopeDist), sd = sd(slopeDist)))) + 
-  geom_rug((aes(x = slopeDist, col = names(slopeDist))), lwd = 1, length = unit(0.1, "npc")) + 
-  xlab(expression(paste("slope of log(", lambda, ") ~ log(N ",italic(t), ")"))) + 
-  ylab("Probability") + 
-  theme_classic() +
-  scale_colour_brewer(palette = "Dark2", guide = "none") 
-# probability of a value higher than 0
-pnorm(0, mean = mean(slopeDist), sd = sd(slopeDist), lower.tail = FALSE)
+  theme_classic() + 
+  geom_text(data = slopeDist, aes(x = x, y = y, col = Site, label = slope), show.legend = FALSE, fontface = "bold")) 
 
 ## plot subpop size in year t+1 as a function of subpop size in year t
-ntplus1_nt_figure <- ggplot(data = byYear_DI_lams) +
+slopeDist_2 <- c(coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Crow_Creek",]))[2],
+                 coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Diamond_Creek",]))[2],
+                 coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ3",]))[2],
+                 coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ5",]))[2],
+                 coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Meadow",]))[2],
+                 coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Unnamed_Creek",]))[2])
+names(slopeDist_2) <- c("Crow_Creek", "Diamond_Creek", "HQ3", "HQ5", "Meadow", "Unnamed_Creek")
+
+slopeDist_2 <- data.frame("Site" = names(slopeDist_2), "slope" = round(slopeDist_2,1),
+                        "x" = c(5.75, 6.57, 5.4, 7.3, 4.55, 6.65),
+                        "y" = c(1.09, 0.975, .98, 1.04, 0.97, 1.03))
+
+
+(ntplus1_nt_figure <- ggplot(data = byYear_DI_lams) +
+    geom_smooth(aes(x = log(N_Site_t), y =  (log(N_Site_tplus1)/log(N_Site_t))), se = FALSE, method = "lm", lty = 2, linewidth = .75, col = "grey") +
   geom_point(aes(x = log(N_Site_t), y = (log(N_Site_tplus1)/log(N_Site_t)), col = Site)) +
   geom_smooth(aes(x =  log(N_Site_t), y = (log(N_Site_tplus1)/log(N_Site_t)), col = Site), se = FALSE, method = "lm", lwd = .75) +
   theme_classic()  +
   scale_color_brewer(type = "qual", palette = "Dark2") +
   xlab(expression(paste("log(N ", italic(t), ")"))) + 
-  ylab(expression(paste("log(N ", italic(t+1), ") / log(N ", italic(t), ")")))
+  ylab(expression(paste("log(N ", italic(t+1), ") / log(N ", italic(t), ")")))+ 
+  geom_text(data = slopeDist_2, aes(x = x, y = y, col = Site, label = slope), 
+            show.legend = FALSE, fontface = "bold")
+) 
 
-slopeDist_2 <- c(coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Crow_Creek",]))[2],
-               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Diamond_Creek",]))[2],
-               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ3",]))[2],
-               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "HQ5",]))[2],
-               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Meadow",]))[2],
-               coefficients(lm((log(N_Site_tplus1)/log(N_Site_t)) ~ log(N_Site_t), data = byYear_DI_lams[byYear_DI_lams$Site == "Unnamed_Creek",]))[2])
-names(slopeDist_2) <- c("Crow_Creek", "Diamond_Creek", "HQ3", "HQ5", "Meadow", "Unnamed_Creek")
 
-ntplus1_nt_distFig <- ggplot() +
-  geom_ribbon(aes(x = seq(-3,.5,length.out = 50)[43:50], 
-                  ymin = 0, 
-                  ymax = dnorm(x = c(seq(-3,.5,length.out = 50)), mean = mean(slopeDist_2), sd = sd(slopeDist_2))[43:50]), colour = "grey80", fill = "grey80") + 
-  geom_vline(aes(xintercept = 0), lty = 2, col = "darkgrey") +
-  geom_line(aes(x = seq(-4.5,.5,length.out = 50), y = dnorm(x = c(seq(-4.5,.5,length.out = 50)), mean = mean(slopeDist_2), sd = sd(slopeDist_2)))) + 
-  geom_rug(aes(x = slopeDist_2, color = names(slopeDist_2)), lwd = 1, length = unit(0.1, "npc")) + 
-  xlab(expression(paste("slope of log(N ",italic(t+1)," / N ", italic(t) ,") ~ log(N", italic(t), ")"))) + 
-  ylab("Probability") + 
-  theme_classic() +
-  scale_colour_brewer(palette = "Dark2", guide = "none") 
-# probability of a value higher than 0
-pnorm(0, mean = mean(slopeDist_2), sd = sd(slopeDist_2), lower.tail = FALSE)
 
-DDfigure <- ggarrange(logLambda_nt_figure, ntplus1_nt_figure, logLambda_nt_distFig, ntplus1_nt_distFig, ncol = 2, nrow = 2, common.legend = TRUE, heights = c(1,.75), legend = "right", align = "v", labels = c("A", "B", "C", "D"))
+DDfigure <- ggarrange(logLambda_nt_figure, ntplus1_nt_figure, ncol = 2, nrow = 1, common.legend = TRUE,  legend = "right", align = "v", labels = c("A", "B"))
 
 ggsave("./figures/densityDependenceFigure.pdf", plot = DDfigure)
-
-#### test figure w/out log-transformed values (to see if comparing log to log is changing my results...)
-
