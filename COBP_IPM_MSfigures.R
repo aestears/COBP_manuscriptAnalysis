@@ -11,12 +11,12 @@ library(mapedit)
 library(ggmap)
 library(ggspatial)
 library(ggrepel)
+library(ggExtra)
 
 # load data
 #source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
-dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
-discDat <- read.csv(file = "../Processed_Data/discreteStageData.csv")
-
+dat_all <- read.csv(file = "../Processed_Data/ZenodoSubmission/allDat_plus_contSeedlings.csv")
+discDat <- read.csv(file = "../Processed_Data/ZenodoSubmission/discreteStageData.csv")
 
 #### figure of vital rates (all data, DI, all transitions) ####
 datSoap <- dat_all[dat_all$Location=="Soapstone",]
@@ -148,6 +148,116 @@ ggpubr::ggarrange(survFig, sizeFig, flwrFig, seedFig, align = "hv",
                   labels = c("A", "B", "C", "D"))
 dev.off()
 
+
+#### figures of vital rates (w/ log-scale axes)####
+# use models fit in previous step 
+# survival
+(survFig <- ggplot() + 
+   theme_classic() +
+   theme(axis.line = element_line(linewidth = 0),
+         panel.border = element_rect(linewidth = 1, fill = NA)) +
+  geom_point(aes(x = exp(dat_all$log_LL_t), y = dat_all$survives_tplus1, col = as.factor(dat_all$survives_tplus1)), alpha = .3) +
+  geom_smooth(aes(x = exp(log_LL_t), y =survives_tplus1), data = survDat_soap, method = "glm", method.args = list(family = "binomial"), col = '#00b159', fill = '#00b159',alpha = .4,  fullrange = TRUE) + 
+  geom_smooth(aes(x = exp(log_LL_t), y = survives_tplus1), data = survDat_Base, method = "glm", method.args = list(family = "binomial"), col = "#f37735", fill = "#f37735", alpha = .4, fullrange = TRUE)  +
+   ylab(c("Probability(survival)")) +
+  xlab(c("leaf size in t (cm)")) +
+  ggtitle("Survival") +
+  scale_color_manual(values = palette(c("grey5", "grey60")), guide = NULL) 
+  #geom_line(aes(x = newdata$log_LL_t, y = predict(object = survMod_soap, newdata =  newdata, type = "response")),  col = '#00b159', lwd = 1.5) +
+  #geom_line(aes(x = newdata$log_LL_t, y = predict(object = survMod_Base, newdata =  newdata, type = "response")),  col = "#f37735", lwd = 1.5) +
+  )
+# add box plots showing distribution of survived and died plants in the upper margin
+(survFig_boxplots <- ggExtra::ggMarginal(
+  p = survFig,
+  type = 'boxplot',
+  margins = 'x',
+  size = 5,
+  colour = 'black',
+  groupFill = TRUE,
+  groupColour = TRUE
+))
+
+  
+# growth
+(sizeFig <- ggplot() +
+    theme_classic() +
+    theme(axis.line = element_line(linewidth = 0),
+          panel.border = element_rect(linewidth = 1, fill = NA)) +
+  geom_point(aes(x = exp(dat_all$log_LL_t), y = exp(dat_all$log_LL_tplus1)), col = "grey40", alpha = .3) +
+  geom_smooth(aes(x = exp(log_LL_t), y = exp(log_LL_tplus1)), data = datSoap, method = "lm", col = '#00b159', fill = '#00b159',alpha = .4,  fullrange = TRUE) + 
+  geom_smooth(aes(x = exp(log_LL_t), y = exp(log_LL_tplus1)), data = datBase, method = "lm", col = "#f37735", fill = "#f37735", alpha = .4, fullrange = TRUE) +
+  ylab(c("leaf size in t+1 (cm)")) +
+  xlab(c("leaf size in t (cm)")) +
+  ggtitle("Growth")+
+  geom_abline(aes(intercept = 0, slope = 1), col = "grey20", lty = 2) +
+  scale_colour_manual(values = c("#f69f71", '#4cc88a'),
+                      guide_legend(title = "Population")) )
+
+# # save legend
+legend <- get_legend(ggplot() +
+                       geom_point(aes(x = dat_all$log_LL_t, y = dat_all$log_LL_tplus1, col = dat_all$Location)) +
+                       ylab(c("log(size_t+1)")) +
+                       xlab(c("log(size_t)")) +
+                       ggtitle("Growth")+
+                       scale_colour_manual(values = c("#f69f71", '#4cc88a'),
+                                           guide_legend(title = "Population")) +
+                       guides(col = guide_legend(direction = "horizontal")) +
+                       geom_line(aes(x = newdata$log_LL_t, y = predict(object = sizeMod_soap, newdata =  newdata, type = "response")),
+                                 col = '#00b159', lwd = 1.5) +
+                       geom_line(aes(x = newdata$log_LL_t, y = predict(object = sizeMod_Base, newdata =  newdata, type = "response")),
+                                 col = "#f37735", lwd = 1.5) +
+                       theme_classic())
+
+# flowering
+(flwrFig <- ggplot() + 
+    theme_classic() +
+    theme(axis.line = element_line(linewidth = 0),
+          panel.border = element_rect(linewidth = 1, fill = NA)) +
+  geom_point(aes(x = exp(dat_all$log_LL_t), y = dat_all$flowering, col = as.factor(dat_all$flowering)),alpha = .3, height = .05) +
+  geom_smooth(aes(x = exp(log_LL_t), y = flowering), formula = (y ~ poly(x,2)), data = datSoap, method = "glm", 
+              method.args = list(family = "binomial"), col = '#00b159', fill = '#00b159',alpha = .4,  fullrange = TRUE) + 
+  geom_smooth(aes(x = exp(log_LL_t), y =flowering), formula = (y ~ poly(x,2)), data = datBase, method = "glm", 
+              method.args = list(family = "binomial"), col = "#f37735", fill = "#f37735", alpha = .4, fullrange = TRUE)  +
+  ylab(c("Probability(flowering)")) +
+  xlab(c("leaf size in t (cm)")) +
+  scale_color_manual(values = palette(c("grey60", "grey5")), guide = NULL) +
+  ggtitle("Flowering "))
+# add boxplots to the margins
+(flwrFig_boxplots <- ggExtra::ggMarginal(
+  p = flwrFig,
+  type = 'boxplot',
+  margins = 'x',
+  size = 5,
+  colour = 'black',
+  groupFill = TRUE,
+  groupColour = TRUE
+))
+
+# seeds
+(seedFig <- ggplot() +
+    theme_classic() +
+    theme(axis.line = element_line(linewidth = 0),
+          panel.border = element_rect(linewidth = 1, fill = NA)) +
+  geom_point(aes(x = exp(dat_all$log_LL_t), y = dat_all$Num_seeds), col = "grey40", alpha = .3) +
+  geom_smooth(aes(x = exp(log_LL_t), y = Num_seeds), 
+              data =  seedDat_soap, method = MASS::glm.nb, 
+              col = '#00b159', fill = '#00b159',alpha = .4,  fullrange = TRUE) + 
+  geom_smooth(aes(x = exp(log_LL_t), y = Num_seeds), 
+              data = seedDat_Base, method = MASS::glm.nb, 
+              col = "#f37735", fill = "#f37735", alpha = .4, fullrange = TRUE)  +
+  ylab(c("Number of Seeds")) +
+  xlab(c("log(size_t)")) +
+  ggtitle("Seed Production")+
+  xlim(c(0,25)) )
+
+## write to file
+pdf(file = "./COBP_demography_MANUSCRIPT/figures/vitalRateModelFit_withBoxplots.pdf", width =  7, height = 5)
+
+cowplot::plot_grid(cowplot::plot_grid(survFig_boxplots, sizeFig, flwrFig_boxplots, seedFig, 
+                                      nrow = 2,
+                                      labels = c("A", "B", "C", "D"), label_size = 12),
+                   legend.grob = legend, ncol = 1, nrow = 2, rel_heights = c(.95,.05))
+dev.off()
 #### figure of IPM matrix (all data, DI, all transitions) ####
 # matrices are called 'mat_all_Soap' and 'mat_all_Base'
 # read in IPM "B"
@@ -355,8 +465,7 @@ allDI_CI <-
 
 # figure of location of plots + species range ---------------------------------------------
 # load data 
-setwd("/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/Raw Data")
-sites <- read.csv("./COBP Plot Locations.csv", stringsAsFactors = FALSE)
+sites <- read.csv("../Raw Data/COBP Plot Locations.csv", stringsAsFactors = FALSE)
 
 #order the sites in alphabetical order by site name 
 sites$site_2 <- str_sub(sites$Site, start = str_locate(sites$Site, " ")[,1]+1, end = str_length(sites$Site)) #make a new variable that shows just the site name (without the location)
@@ -410,6 +519,7 @@ st_crs(sites_pops) <- 4326
 # # distMap_final <- st_make_valid(distMap_final)
 # saveRDS(distMap_final, file = "../Raw Data/SpatialDistributionMap")
 
+distMap_final <- readRDS("../Raw Data/SpatialDistributionMap")
 # define the palette for each subpopulation (plot)
 pal <- colorFactor(
   palette = "Dark2",
@@ -424,20 +534,6 @@ pal_dist <- colorFactor(
 )
 
 ## map of species distributions and population locations
-# leaflet()  %>% 
-#   addProviderTiles(providers$Esri.WorldImagery) %>% 
-#   addPolygons(data = distMap_final[distMap_final$distType == "historical",], color = "black", weight = 1, opacity = 1, fillOpacity = .5, fillColor = "#95b1c0") %>%
-#   addPolygons(data = distMap_final[distMap_final$distType == "current",], color = "black", weight = 1, opacity = 1, fillOpacity = .7, fillColor = "#2B6482") %>%
-#   #addCircles(data = sites_centroids, col = "black", radius = 600, opacity = .7, weight = 1, fillColor = ~pal_subPop(sites_centroids$site_2), fillOpacity = .7) %>%
-#   addCircles(data = sites_pops, col = "black", radius = 2000, opacity = 1, weight = 1, fillColor = "black", fillOpacity = 1) %>% 
-#   addLabelOnlyMarkers(lat = st_coordinates(sites_pops[1,])[2], 
-#                       lng = st_coordinates(sites_pops[1,])[1],
-#                       label = "FEWAFB", labelOptions = list(permanent = TRUE)) %>%
-#   addLabelOnlyMarkers(lat = st_coordinates(sites_pops[2,])[2], 
-#                       lng = st_coordinates(sites_pops[2,])[1],
-#                       label = "Soapstone Prairie", labelOptions = list(permanent = TRUE, direction = "bottom")) %>% 
-#   addLegend(position = "bottomright", colors = c("#2B6482", "#95b1c0"), labels = c("Current", "Historical"), title = "Species Distribution") %>% 
-#   addScaleBar(position = "bottomright")
 
 ## ggmap version
 dist_bbox <- st_bbox(st_buffer(st_union(distMap_final),10000))
@@ -447,6 +543,7 @@ terrain_basemap <- get_map(
   zoom = 10,
   maptype = 'terrain-background', 
   source = 'stamen')
+
 
 ggmap(terrain_basemap) + 
   geom_sf(data = distMap_final, 
