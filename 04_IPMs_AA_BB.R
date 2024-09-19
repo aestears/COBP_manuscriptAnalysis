@@ -4,7 +4,7 @@
 # 08 December 2021
 #/////////////////////////
 #### load vital rate models from previous script ####
-source("./analysis_scripts/01_VitalRateModels.R")
+source("./COBP_manuscriptAnalysis/01_VitalRateModels.R")
 
 #### vital rate functions #### 
 ## same for both models 

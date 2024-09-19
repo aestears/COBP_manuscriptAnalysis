@@ -5,7 +5,7 @@
 #/////////////////////////
 
 #### load vital rate models from previous script ####
-source("./analysis_scripts/01_VitalRateModels.R")
+source("./COBP_manuscriptAnalysis/01_VitalRateModels.R")
 
 #### IPM CC-HH ####
 ### DI IPM for each site--first half of data, discrete ###

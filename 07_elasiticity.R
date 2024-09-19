@@ -9,7 +9,7 @@ library(tidyverse)
 library(ipmr)
 
 #### load vital rate models from previous script ####
-source("./analysis_scripts/01_VitalRateModels.R")
+source("./COBP_manuscriptAnalysis/01_VitalRateModels.R")
 load(file = "./intermediate_analysis_Data/ipmA_B_results.RData")
 
 # lower limit of size in the ipm

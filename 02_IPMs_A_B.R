@@ -9,7 +9,7 @@ library(ipmr)
 library(tidyverse)
 
 #### load vital rate models from previous script ####
-source("./analysis_scripts/01_VitalRateModels.R")
+  source("./COBP_manuscriptAnalysis/01_VitalRateModels.R")
 
 #### IPM A #### 
 ## deterministic, density-independent IPM using only continuous stages (no seedlings) and data from all transitions ##

@@ -11,8 +11,8 @@ library(MASS)
 #### load data from the previous script ####
 # (COBP_IPM_01_dataPrep.R)
 #source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
-dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
-discDat <- read.csv(file = "../Processed_Data/discreteStageData.csv")
+dat_all <- read.csv(file = "../Processed_Data/ZenodoSubmission/allDat_plus_contSeedlings.csv")
+discDat <- read.csv(file = "../Processed_Data/ZenodoSubmission/discreteStageData.csv")
 
 #### calculate seedbank vital rates ####
 ## data from Burgess, Hild & Shaw, 2005--NOT using data from MT place, only from FEWAFB
@@ -128,29 +128,29 @@ viab.rt <- total_seed_viab.rt
  # subset the data to exclude flowering individuals
  survDat_N <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering),]
  # logistic glm with log-transformed size_t
- survMod_N <- glm(survives_tplus1 ~ log_LL_t + N_all_plot , data = survDat_N, family = binomial)
+ survMod_N <- glm(survives_tplus1 ~ log_LL_t + N_all_plot_t , data = survDat_N, family = binomial)
  summary(survMod_N)
  # plot model results 
  plot(survives_tplus1 ~ log_LL_t, data = survDat_N)
  newdata <- data.frame("log_LL_t" = seq(from = min(survDat_N$log_LL_t, na.rm = TRUE), 
                                         to = max(survDat_N$log_LL_t, na.rm = TRUE),
                                         length.out = 100),  
-                       "N_all_plot" = seq(from = min(survDat_N$N_all_plot, na.rm = TRUE),
-                                     to = max(survDat_N$N_all_plot, na.rm = TRUE), 
+                       "N_all_plot_t" = seq(from = min(survDat_N$N_all_plot_t, na.rm = TRUE),
+                                     to = max(survDat_N$N_all_plot_t, na.rm = TRUE), 
                                      length.out = 100))
  lines(x = newdata$log_LL_t, y = predict(object = survMod_N, newdata =  newdata, type = "response"), col = "red")
  
  ## Growth ($G(z',z)$)
  # lm w/ log-transformed size_t and size_t+1
- sizeMod_N <- lm(log_LL_tplus1 ~ log_LL_t + N_all_plot, data = dat_all)
+ sizeMod_N <- lm(log_LL_tplus1 ~ log_LL_t + N_all_plot_t, data = dat_all)
  summary(sizeMod_N)
  # plot model results
  plot(log_LL_tplus1 ~ log_LL_t, data = dat_all)
  newdata <- data.frame("log_LL_t" = seq(from = min(dat_all$log_LL_t, na.rm = TRUE), 
                                         to = max(dat_all$log_LL_t, na.rm = TRUE),
                                         length.out = 100),
-                       "N_all_plot" = seq(from = min(dat_all$N_all_plot, na.rm = TRUE),
-                                     to = max(dat_all$N_all_plot, na.rm = TRUE),
+                       "N_all_plot_t" = seq(from = min(dat_all$N_all_plot_t, na.rm = TRUE),
+                                     to = max(dat_all$N_all_plot_t, na.rm = TRUE),
                                      length.out = 100))
  lines(x = newdata$log_LL_t, y = predict(object = sizeMod_N, newdata =  newdata), col = "red")
  lines(x = c(-1,4), y = c(-1,4), col = "darkgrey", lty = 2)
@@ -171,7 +171,7 @@ viab.rt <- total_seed_viab.rt
  ## Flowering probability ($p_b(z)$)
  # using size in current year (w/ squared term)
  # logistic glm with log-transformed size_t
- flwrMod_N <- suppressWarnings(glm(flowering ~ log_LL_t + I(log_LL_t^2) + N_all_plot,
+ flwrMod_N <- suppressWarnings(glm(flowering ~ log_LL_t + I(log_LL_t^2) + N_all_plot_t,
                                     data = dat_all, family = binomial))
  summary(flwrMod_N)
  # plot model results 
@@ -179,8 +179,8 @@ viab.rt <- total_seed_viab.rt
  newdata <- data.frame("log_LL_t" = seq(from = min(dat_all$log_LL_t, na.rm = TRUE), 
                                         to = max(dat_all$log_LL_t, na.rm = TRUE),
                                         length.out = 100),
-                       "N_all_plot" = seq(from = min(dat_all$N_all_plot, na.rm = TRUE),
-                                     to = max(dat_all$N_all_plot, na.rm = TRUE), length.out = 100))
+                       "N_all_plot_t" = seq(from = min(dat_all$N_all_plot_t, na.rm = TRUE),
+                                     to = max(dat_all$N_all_plot_t, na.rm = TRUE), length.out = 100))
 
  lines(x = newdata$log_LL_t, y = predict(object = flwrMod_N, newdata =  newdata, type = "response"), col = "red")
  
@@ -512,14 +512,14 @@ for (i in 1:length(siteNames)) {
   survDat_now <- dat_all[dat_all$flowering==0 | is.na(dat_all$flowering) & 
                        dat_all$Site == site_now,]
   # fit model and store in list
-  temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + N_all_plot, data = survDat_now, family = binomial)
+  temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + N_all_plot_t, data = survDat_now, family = binomial)
   names(temp_mod_list)[1] <- paste0("surv")
   
   ## fit growth model
   # get all data, but just for this site
   allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
-  temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + N_all_plot, data = allDat_now)
+  temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + N_all_plot_t, data = allDat_now)
   names(temp_mod_list)[2] <- paste0("growth")
   
   ## number of seeds produced, according to plant size
@@ -535,7 +535,7 @@ for (i in 1:length(siteNames)) {
   ## distribution of recruit size
   recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
                     dat_all$Site == site_now,]
-  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + N_all_plot, data = recD_now)
+  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + N_all_plot_t, data = recD_now)
   names(temp_mod_list)[5] <- paste0("recruitDist")
   
   ## store the temporary model list in the appropriate slot of the 'det_DI_mods' list
@@ -627,7 +627,7 @@ for (i in 1:length(siteNames)) {
                        dat_all$Site == site_now,]
   # fit model and store in list
   temp_mod_list[[1]] <- glm(survives_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s + tMean_grow_C_s +  
-                              SoilTemp_grow_C_s + N_all_plot, 
+                              SoilTemp_grow_C_s + N_all_plot_t, 
                             data = survDat_now, 
                             family = binomial)
   names(temp_mod_list)[1] <- paste0("surv")
@@ -637,7 +637,7 @@ for (i in 1:length(siteNames)) {
   allDat_now <- dat_all[dat_all$Site == site_now,]
   # fit model and store in a list
   temp_mod_list[[2]] <- lm(log_LL_tplus1 ~ log_LL_t + SoilMoisture_m3m3_s +  
-                              N_all_plot, 
+                              N_all_plot_t, 
                            data = allDat_now)
   names(temp_mod_list)[2] <- paste0("growth")
   
@@ -658,7 +658,7 @@ for (i in 1:length(siteNames)) {
   ## distribution of recruit size
   recD_now <- dat_all[dat_all$age == 0 & is.na(dat_all$age) == FALSE & 
                     dat_all$Site == site_now,]
-  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + SoilMoisture_m3m3_s + N_all_plot, data = recD_now)
+  temp_mod_list[[5]] <- lm(log_LL_t ~ 1 + SoilMoisture_m3m3_s + N_all_plot_t, data = recD_now)
   names(temp_mod_list)[5] <- paste0("recruitDist")
   
   ## store the temporary model list in the appropriate slot of the 'det_DI_mods' list
@@ -667,3 +667,61 @@ for (i in 1:length(siteNames)) {
 }
 ## use uniform p.estab, outSB, staySB, and goSB estimates 
 
+
+## find out how many individuals are biennial 
+# calculate age at death for each individual
+test <- dat_all %>% 
+  group_by(Location, Site, Plot_ID, Quadrant, ID) %>% 
+  summarize(ageAtDeath = max(age),
+            diedDuringStudy = (survives_tplus1 == 0)) %>% 
+  group_by(Location, Site, Plot_ID, Quadrant, ID) %>% 
+  summarize(diedDuringStudy = sum(diedDuringStudy), 
+            ageAtDeath = max(ageAtDeath)) %>% 
+  filter(ageAtDeath == 1 & 
+           diedDuringStudy == 1) 
+nrow(test)
+
+test2 <- dat_all %>% 
+  filter(!is.na(age)) %>% 
+  dplyr::select(Location, Site, Plot_ID, Quadrant, ID) %>% 
+  unique()
+nrow(test2)
+
+dat_all$uniqueID <- paste0(dat_all$Plot_ID, "_", dat_all$Quadrant, "_", dat_all$ID)
+# look at cohort recruited in 2018 
+RecruitIDs_2018  <- dat_all %>% 
+  filter(Year == 2018 & 
+           seedling == 1)
+
+nrow(RecruitIDs_2018)  ## 1802 individuals that were recruited in 2018
+
+survIDs <- RecruitIDs_2018 %>% 
+  filter(survives_tplus1 == 1)
+test <- dat_all %>% 
+  filter(uniqueID %in% survIDs$uniqueID) %>% # get those individuals that were recruited in 2018 and survived past 2018
+  filter(survives_tplus1 == 0) %>% # filter to the year when these individuals died
+  filter(Year == 2019)# filter for those that died in 2020 (had a 0 for survives_tplus1 in 2019)
+
+length(test$uniqueID)
+## 351 individuals recruited in 2018 died after 2 years (20% were biennial)
+  
+## how many of the 2018 individuals flowered? 
+test2 <- dat_all %>% 
+  filter(uniqueID %in% survIDs$uniqueID) %>% 
+  filter(flowering == 1)
+  ## 24/1802 individuals from 2018 flowered in the time we observed them (1.3%)
+
+## how many of the 2018 *biennials flowered?* 
+test3 <- dat_all %>% 
+  filter(uniqueID %in% test$uniqueID)%>% 
+  filter(flowering == 1)
+# only 5 of the 351 biennials flowered (1.4% of the biennial population)
+
+
+## what is the average age of flowering individuals 
+flwr <- dat_all %>% 
+  filter(flowering == 1) 
+
+mean(flwr$age, na.rm = TRUE)
+
+  
